@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_agent">エージェントの動作</string>
+    <string name="notif_idle">待機中</string>
+    <plurals name="notif_working">
+        <item quantity="other">%1$d件のチャットを実行中</item>
+    </plurals>
+    <string name="notif_starting">エンジンを起動中</string>
+    <string name="notif_unpacking">Ubuntuを展開中</string>
+    <string name="notif_stop">停止</string>
+</resources>

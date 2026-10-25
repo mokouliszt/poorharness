@@ -1,0 +1,12 @@
+# build outputs
+.cache/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+webui/node_modules/
+webui/dist/
+# signing material never belongs in the repository
+*.jks
+*.keystore
+

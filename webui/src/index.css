@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Palette: true black base; white is reserved for what the user wrote and for
+   primary actions. Channels (not hex) so Tailwind opacity modifiers work. */
+:root {
+  --void: 0 0 0;
+  --surface: 22 22 22;
+  --raised: 33 33 33;
+  --line: 46 46 46;
+  --mute: 145 145 145;
+  --ink: 236 236 236;
+  --paper: 255 255 255;
+  --danger: 229 72 77;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: rgb(var(--void));
+  color: rgb(var(--ink));
+  font-family: "IBM Plex Sans", "Noto Sans JP", "Noto Sans CJK JP", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+::selection {
+  background: rgb(var(--paper) / 0.25);
+}
+
+/* Visible keyboard focus everywhere, quiet for touch. */
+:focus-visible {
+  outline: 2px solid rgb(var(--paper) / 0.8);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Short UI lines in Japanese break between phrases, not inside words
+   (Chromium 119+; older WebViews keep the default). */
+.phrase {
+  word-break: auto-phrase;
+}
+
+/* Agent output rendered from markdown. */
+.prose-agent {
+  font-size: 15px;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+.prose-agent > * + * {
+  margin-top: 0.7em;
+}
+.prose-agent h1,
+.prose-agent h2,
+.prose-agent h3 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 1.1em;
+}
+.prose-agent h1 { font-size: 20px; }
+.prose-agent h2 { font-size: 18px; }
+.prose-agent h3 { font-size: 16px; }
+.prose-agent a {
+  color: rgb(var(--paper));
+  text-decoration: underline;
+  text-decoration-color: rgb(var(--paper) / 0.4);
+  text-underline-offset: 3px;
+}
+.prose-agent ul,
+.prose-agent ol {
+  padding-left: 1.3em;
+}
+.prose-agent ul { list-style: disc; }
+.prose-agent ol { list-style: decimal; }
+.prose-agent li + li { margin-top: 0.25em; }
+.prose-agent blockquote {
+  border-left: 2px solid rgb(var(--line));
+  padding-left: 0.9em;
+  color: rgb(var(--mute));
+}
+.prose-agent pre {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12.5px;
+  line-height: 19px;
+  background: rgb(var(--surface));
+  border: 1px solid rgb(var(--line));
+  border-radius: 12px;
+  padding: 10px 12px;
+  overflow-x: auto;
+}
+.prose-agent :not(pre) > code {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.88em;
+  background: rgb(var(--raised));
+  border-radius: 5px;
+  padding: 0.1em 0.35em;
+}
+.prose-agent table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.prose-agent th,
+.prose-agent td {
+  border: 1px solid rgb(var(--line));
+  padding: 4px 8px;
+  text-align: left;
+}
+.prose-agent hr {
+  border-color: rgb(var(--line));
+}
+
+.scroll-quiet {
+  scrollbar-width: none;
+}
+.scroll-quiet::-webkit-scrollbar {
+  display: none;
+}

@@ -1,0 +1,29 @@
+{
+ "object": "list",
+ "data": [
+  {
+   "id": "deepseek-ai/deepseek-v4.1-flash",
+   "object": "model",
+   "created": 735790403,
+   "owned_by": "deepseek-ai"
+  },
+  {
+   "id": "meta/llama2-70b",
+   "object": "model",
+   "created": 735790403,
+   "owned_by": "meta"
+  },
+  {
+   "id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "object": "model",
+   "created": 735790403,
+   "owned_by": "nvidia"
+  },
+  {
+   "id": "z-ai/glm-5.3-flash",
+   "object": "model",
+   "created": 735790403,
+   "owned_by": "z-ai"
+  }
+ ]
+}

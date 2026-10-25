@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PoorHarness</string>
+    <string name="channel_agent">Agent activity</string>
+    <string name="notif_idle">Idle</string>
+    <plurals name="notif_working">
+        <item quantity="one">Working on %1$d chat</item>
+        <item quantity="other">Working on %1$d chats</item>
+    </plurals>
+    <string name="notif_starting">Starting engine</string>
+    <string name="notif_unpacking">Unpacking Ubuntu</string>
+    <string name="notif_stop">Stop</string>
+</resources>

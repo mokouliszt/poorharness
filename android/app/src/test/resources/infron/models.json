@@ -1,0 +1,536 @@
+{
+ "success": true,
+ "data": [
+  {
+   "id": "sao10k/l3.1-70b-hanami-x1",
+   "object": "model",
+   "created": 1626777600,
+   "model_id": "sao10k/l3.1-70b-hanami-x1",
+   "canonical_slug": "sao10k/l3.1-70b-hanami-x1",
+   "display_name": "Sao10k: l3.1-70b-hanami-x1",
+   "model_family": "Llama",
+   "model_family_id": 31,
+   "category_type": "LLM",
+   "context_length": 10000,
+   "max_input_tokens": 10000,
+   "max_output_tokens": 10000,
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "supports_streaming": true,
+   "supports_function_calling": false,
+   "supports_vision": false,
+   "supports_json_mode": false,
+   "deprecated": false,
+   "is_display_only": true,
+   "supports_playground": true,
+   "min_prompt_price": 0,
+   "min_completion_price": 0,
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "provider_count": 1,
+   "providers": [
+    {
+     "provider_slug": "infermatic",
+     "service_tier": "standard",
+     "endpoint_name": "Sao10K-L3.1-70B-Hanami-x1",
+     "prompt_price": 0,
+     "completion_price": 0,
+     "context_length": 32000,
+     "is_zdr": false,
+     "allows_distillation": true,
+     "data_collection_policy": "deny",
+     "quantization": "fp16"
+    }
+   ]
+  },
+  {
+   "id": "qwen/qwen3.8-27b:free",
+   "object": "model",
+   "created": 1626777600,
+   "model_id": "qwen/qwen3.8-27b:free",
+   "canonical_slug": "qwen/qwen3.8-27b:free",
+   "display_name": "Qwen: Qwen3.8 27B Uncensored (Free)",
+   "model_family": "Qwen",
+   "model_family_id": 49,
+   "category_type": "LLM",
+   "context_length": 256000,
+   "max_input_tokens": 256000,
+   "max_output_tokens": 256000,
+   "input_modalities": [
+    "text",
+    "image",
+    "video"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "supports_streaming": true,
+   "supports_function_calling": true,
+   "supports_vision": true,
+   "supports_json_mode": true,
+   "deprecated": false,
+   "is_display_only": false,
+   "supports_playground": false,
+   "min_prompt_price": 0,
+   "min_completion_price": 0,
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "provider_count": 1,
+   "providers": [
+    {
+     "provider_slug": "infron/us",
+     "service_tier": "standard",
+     "endpoint_name": "Qwen/Qwen3.8-27B",
+     "prompt_price": 0,
+     "completion_price": 0,
+     "context_length": 204000,
+     "is_zdr": true,
+     "allows_distillation": true,
+     "data_collection_policy": "deny",
+     "quantization": "fp8"
+    }
+   ]
+  },
+  {
+   "id": "deepseek/deepseek-v4.1-flash:free",
+   "object": "model",
+   "created": 1626777600,
+   "model_id": "deepseek/deepseek-v4.1-flash:free",
+   "canonical_slug": "deepseek/deepseek-v4.1-flash:free",
+   "display_name": "DeepSeek: Deepseek V4.1 Flash (Free)",
+   "model_family": "DeepSeek",
+   "model_family_id": 9,
+   "category_type": "LLM",
+   "context_length": 1000000,
+   "max_input_tokens": 1000000,
+   "max_output_tokens": 384000,
+   "input_modalities": [
+    "text",
+    "image"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "supports_streaming": true,
+   "supports_function_calling": true,
+   "supports_vision": true,
+   "supports_json_mode": true,
+   "deprecated": false,
+   "is_display_only": false,
+   "supports_playground": false,
+   "min_prompt_price": 0,
+   "min_completion_price": 0,
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "provider_count": 1,
+   "providers": [
+    {
+     "provider_slug": "infron/sg",
+     "service_tier": "standard",
+     "endpoint_name": "deepseek-v4.1-flash",
+     "prompt_price": 0,
+     "completion_price": 0,
+     "context_length": 1000000,
+     "is_zdr": true,
+     "allows_distillation": true,
+     "data_collection_policy": "deny"
+    }
+   ]
+  },
+  {
+   "id": "qwen/qwen3.8-27b-abliterated-cyber:free",
+   "object": "model",
+   "created": 1626777600,
+   "model_id": "qwen/qwen3.8-27b-abliterated-cyber:free",
+   "canonical_slug": "qwen/qwen3.8-27b-abliterated-cyber:free",
+   "display_name": "Qwen: Qwen3.8 27B Abliterated Cyber (Free)",
+   "model_family": "Qwen",
+   "model_family_id": 49,
+   "category_type": "LLM",
+   "context_length": 256000,
+   "max_input_tokens": 256000,
+   "max_output_tokens": 131072,
+   "input_modalities": [
+    "text",
+    "image"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "supports_streaming": true,
+   "supports_function_calling": true,
+   "supports_vision": true,
+   "supports_json_mode": true,
+   "deprecated": false,
+   "is_display_only": false,
+   "supports_playground": false,
+   "min_prompt_price": 0,
+   "min_completion_price": 0,
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "provider_count": 1,
+   "providers": [
+    {
+     "provider_slug": "infron/us",
+     "service_tier": "standard",
+     "endpoint_name": "Qwen/Qwen3.8-27B-Abliterated-Cyber",
+     "prompt_price": 0,
+     "completion_price": 0,
+     "context_length": 256000,
+     "is_zdr": true,
+     "allows_distillation": true,
+     "data_collection_policy": "deny",
+     "quantization": "fp4"
+    }
+   ]
+  },
+  {
+   "id": "internlm/atria-dawn-preview:free",
+   "object": "model",
+   "created": 1626777600,
+   "model_id": "internlm/atria-dawn-preview:free",
+   "canonical_slug": "internlm/atria-dawn-preview:free",
+   "display_name": "Atria: Dawn Preview (Free)",
+   "model_family": "Atria",
+   "model_family_id": 127,
+   "category_type": "LLM",
+   "context_length": 256000,
+   "max_input_tokens": 256000,
+   "max_output_tokens": 65536,
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "supports_streaming": true,
+   "supports_function_calling": true,
+   "supports_vision": true,
+   "supports_json_mode": true,
+   "deprecated": false,
+   "is_display_only": false,
+   "supports_playground": false,
+   "min_prompt_price": 0,
+   "min_completion_price": 0,
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "provider_count": 1,
+   "providers": [
+    {
+     "provider_slug": "atria",
+     "service_tier": "standard",
+     "endpoint_name": "Atria-Dawn-Preview",
+     "prompt_price": 0,
+     "completion_price": 0,
+     "context_length": 256000,
+     "is_zdr": false,
+     "allows_distillation": true,
+     "data_collection_policy": "deny"
+    }
+   ]
+  },
+  {
+   "id": "inclusionai/ling-3.1-flash:free",
+   "object": "model",
+   "created": 1626777600,
+   "model_id": "inclusionai/ling-3.1-flash:free",
+   "canonical_slug": "inclusionai/ling-3.1-flash:free",
+   "display_name": "Ling 3.1 Flash (Free)",
+   "model_family": "inclusionai",
+   "model_family_id": 71,
+   "category_type": "LLM",
+   "context_length": 262144,
+   "max_input_tokens": 262144,
+   "max_output_tokens": 32768,
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "supports_streaming": true,
+   "supports_function_calling": true,
+   "supports_vision": true,
+   "supports_json_mode": true,
+   "deprecated": false,
+   "is_display_only": false,
+   "supports_playground": false,
+   "min_prompt_price": 0,
+   "min_completion_price": 0,
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "provider_count": 1,
+   "providers": [
+    {
+     "provider_slug": "novita",
+     "service_tier": "standard",
+     "endpoint_name": "inclusionai/ling-3.1-flash",
+     "prompt_price": 0,
+     "completion_price": 0,
+     "context_length": 262144,
+     "is_zdr": true,
+     "allows_distillation": true,
+     "data_collection_policy": "deny"
+    }
+   ]
+  },
+  {
+   "id": "apodex/apodex-1.1-mini:free",
+   "object": "model",
+   "created": 1626777600,
+   "model_id": "apodex/apodex-1.1-mini:free",
+   "canonical_slug": "apodex/apodex-1.1-mini:free",
+   "display_name": "Apodex 1.1 Mini (Free)",
+   "model_family": "Apodex",
+   "model_family_id": 119,
+   "category_type": "LLM",
+   "context_length": 262144,
+   "max_input_tokens": 262144,
+   "max_output_tokens": 262144,
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "supports_streaming": true,
+   "supports_function_calling": true,
+   "supports_vision": true,
+   "supports_json_mode": true,
+   "deprecated": false,
+   "is_display_only": false,
+   "supports_playground": false,
+   "min_prompt_price": 0,
+   "min_completion_price": 0,
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "provider_count": 1,
+   "providers": [
+    {
+     "provider_slug": "novita",
+     "service_tier": "standard",
+     "endpoint_name": "apodex/apodex-1.1-mini",
+     "prompt_price": 0,
+     "completion_price": 0,
+     "context_length": 262144,
+     "is_zdr": true,
+     "allows_distillation": true,
+     "data_collection_policy": "deny"
+    }
+   ]
+  },
+  {
+   "id": "deepseek/deepseek-v4.1-flash",
+   "object": "model",
+   "created": 1626777600,
+   "model_id": "deepseek/deepseek-v4.1-flash",
+   "canonical_slug": "deepseek/deepseek-v4.1-flash",
+   "display_name": "DeepSeek: Deepseek V4.1 Flash",
+   "model_family": "DeepSeek",
+   "model_family_id": 9,
+   "category_type": "LLM",
+   "context_length": 1000000,
+   "max_input_tokens": 1000000,
+   "max_output_tokens": 384000,
+   "input_modalities": [
+    "text",
+    "image"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "supports_streaming": true,
+   "supports_function_calling": true,
+   "supports_vision": true,
+   "supports_json_mode": true,
+   "deprecated": false,
+   "is_display_only": false,
+   "supports_playground": false,
+   "min_prompt_price": 0.1132,
+   "min_completion_price": 0.4524,
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "provider_count": 11,
+   "providers": [
+    {
+     "provider_slug": "alibaba/cn",
+     "service_tier": "flex",
+     "endpoint_name": "deepseek-v4.1-flash",
+     "prompt_price": 0.1132,
+     "completion_price": 0.4524,
+     "context_length": 1000000,
+     "is_zdr": false,
+     "allows_distillation": true,
+     "data_collection_policy": "deny"
+    },
+    {
+     "provider_slug": "alibaba/us",
+     "service_tier": "standard",
+     "endpoint_name": "deepseek-v4.1-flash",
+     "prompt_price": 0.1132,
+     "completion_price": 0.4524,
+     "context_length": 1000000,
+     "is_zdr": true,
+     "allows_distillation": true,
+     "data_collection_policy": "deny"
+    },
+    {
+     "provider_slug": "alibaba/hk",
+     "service_tier": "standard",
+     "endpoint_name": "deepseek-v4.1-flash",
+     "prompt_price": 0.1132,
+     "completion_price": 0.4524,
+     "context_length": 1000000,
+     "is_zdr": true,
+     "allows_distillation": true,
+     "data_collection_policy": "deny"
+    },
+    {
+     "provider_slug": "alibaba/eu",
+     "service_tier": "standard",
+     "endpoint_name": "deepseek-v4.1-flash",
+     "prompt_price": 0.1132,
+     "completion_price": 0.4524,
+     "context_length": 1000000,
+     "is_zdr": true,
+     "allows_distillation": true,
+     "data_collection_policy": "deny"
+    },
+    {
+     "provider_slug": "alibaba/jp",
+     "service_tier": "standard",
+     "endpoint_name": "deepseek-v4.1-flash",
+     "prompt_price": 0.1132,
+     "completion_price": 0.4524,
+     "context_length": 1000000,
+     "is_zdr": true,
+     "allows_distillation": true,
+     "data_collection_policy": "deny"
+    },
+    {
+     "provider_slug": "alibaba/sg",
+     "service_tier": "standard",
+     "endpoint_name": "deepseek-v4.1-flash",
+     "prompt_price": 0.12,
+     "completion_price": 0.48,
+     "context_length": 1000000,
+     "is_zdr": true,
+     "allows_distillation": true,
+     "data_collection_policy": "deny"
+    },
+    {
+     "provider_slug": "byteplus",
+     "service_tier": "standard",
+     "endpoint_name": "deepseek-v4.1-flash",
+     "prompt_price": 0.12,
+     "completion_price": 0.48,
+     "context_length": 1000000,
+     "is_zdr": true,
+     "allows_distillation": true,
+     "data_collection_policy": "deny"
+    },
+    {
+     "provider_slug": "volcengine",
+     "service_tier": "flex",
+     "endpoint_name": "deepseek-v4.1-flash",
+     "prompt_price": 0.12,
+     "completion_price": 0.48,
+     "context_length": 1000000,
+     "is_zdr": true,
+     "allows_distillation": true,
+     "data_collection_policy": "deny"
+    },
+    {
+     "provider_slug": "tencentcloud",
+     "service_tier": "standard",
+     "endpoint_name": "deepseek-v4.1-flash",
+     "prompt_price": 0.12,
+     "completion_price": 0.48,
+     "context_length": 1000000,
+     "is_zdr": true,
+     "allows_distillation": true,
+     "data_collection_policy": "deny"
+    },
+    {
+     "provider_slug": "baidu-cloud",
+     "service_tier": "standard",
+     "endpoint_name": "deepseek-v4.1-flash",
+     "prompt_price": 0.12,
+     "completion_price": 0.48,
+     "context_length": 1000000,
+     "is_zdr": false,
+     "allows_distillation": true,
+     "data_collection_policy": "deny",
+     "quantization": "fp8"
+    },
+    {
+     "provider_slug": "deepseek",
+     "service_tier": "standard",
+     "endpoint_name": "deepseek-flash",
+     "prompt_price": 0.3,
+     "completion_price": 1.2,
+     "context_length": 1000000,
+     "is_zdr": true,
+     "allows_distillation": true,
+     "data_collection_policy": "deny"
+    }
+   ]
+  },
+  {
+   "id": "bytedance/seedance-2.0/fast/text-to-video",
+   "object": "model",
+   "created": 1626777600,
+   "model_id": "bytedance/seedance-2.0/fast/text-to-video",
+   "canonical_slug": "bytedance/seedance-2.0/fast/text-to-video",
+   "display_name": "ByteDance: Seedance 2.0 Fast (Text to Video)",
+   "model_family": "ByteDance",
+   "model_family_id": 63,
+   "category_type": "Text to Video",
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "video"
+   ],
+   "supports_streaming": false,
+   "supports_function_calling": false,
+   "supports_vision": false,
+   "supports_json_mode": false,
+   "deprecated": false,
+   "is_display_only": false,
+   "supports_playground": false,
+   "min_prompt_price": 0,
+   "min_completion_price": 0,
+   "min_request_price": 0.06,
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "provider_count": 1,
+   "providers": [
+    {
+     "provider_slug": "byteplus",
+     "service_tier": "standard",
+     "endpoint_name": "ep-20260522151938-q2tcd",
+     "prompt_price": 0,
+     "completion_price": 0,
+     "request_price": 0.06,
+     "is_zdr": false,
+     "allows_distillation": true,
+     "data_collection_policy": "allow"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,265 @@
+{
+ "success": true,
+ "data": [
+  {
+   "model_name": "z-ai/glm-5.3-flash-free",
+   "vendor_id": 12,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "orcarouter_team",
+    "svip",
+    "vip",
+    "enterprise",
+    "ka",
+    "low_discount",
+    "default",
+    "oc"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "display_name": "Z.ai: GLM 5.3 Flash (Free)",
+   "context_length": 1000000,
+   "max_completion_tokens": 128000,
+   "input_modalities": [
+    "text",
+    "image",
+    "video"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "stream",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+   ],
+   "is_free_tier": true,
+   "free_base_model": "z-ai/glm-5.3-flash",
+   "zdr_route": false
+  },
+  {
+   "model_name": "orca/orcaverify-text1.0-free",
+   "vendor_id": 11,
+   "quota_type": 0,
+   "model_ratio": 0,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 1,
+   "enable_groups": [
+    "default",
+    "ka",
+    "svip",
+    "vip"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "display_name": "Orca: OrcaVerify Text 1.0 (Free)",
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "supported_parameters": [
+    "stream",
+    "stream_options"
+   ],
+   "is_free_tier": true,
+   "free_base_model": "orca/orcaverify-text1.0",
+   "zdr_route": false
+  },
+  {
+   "model_name": "deepseek/deepseek-v4.1-flash",
+   "icon": "DeepSeek.Color",
+   "vendor_id": 2,
+   "quota_type": 0,
+   "model_ratio": 0.075,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 4,
+   "cache_ratio": 0.02,
+   "enable_groups": [
+    "oc",
+    "orcarouter_team",
+    "vip",
+    "byte_plus",
+    "ds-group",
+    "enterprise",
+    "svip",
+    "default",
+    "ka"
+   ],
+   "supported_endpoint_types": [
+    "openai",
+    "anthropic",
+    "openai-response"
+   ],
+   "display_name": "DeepSeek: DeepSeek V4.1 Flash",
+   "context_length": 1048576,
+   "max_completion_tokens": 384000,
+   "input_modalities": [
+    "text",
+    "image"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "supported_parameters": [
+    "include_reasoning",
+    "logprobs",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "stream",
+    "stream_options",
+    "temperature",
+    "thinking",
+    "tool_choice",
+    "tools",
+    "top_logprobs",
+    "top_p",
+    "user_id"
+   ],
+   "quality_score": 8,
+   "created": 1792220400,
+   "is_featured": true,
+   "zdr_route": false,
+   "timed_pricing": {
+    "timezone": "UTC",
+    "windows": [
+     {
+      "start": "01:00",
+      "end": "04:00",
+      "multiplier": 2
+     },
+     {
+      "start": "06:00",
+      "end": "10:00",
+      "multiplier": 2
+     }
+    ]
+   }
+  },
+  {
+   "model_name": "deepseek/deepseek-v4.1-flash-free",
+   "icon": "DeepSeek.Color",
+   "vendor_id": 41,
+   "quota_type": 0,
+   "model_ratio": 0,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 1,
+   "enable_groups": [
+    "svip",
+    "vip",
+    "default",
+    "orcarouter_team"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "display_name": "DeepSeek: DeepSeek V4.1 Flash (Free)",
+   "context_length": 1048576,
+   "max_completion_tokens": 384000,
+   "input_modalities": [
+    "text",
+    "image"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "supported_parameters": [
+    "include_reasoning",
+    "logprobs",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "stop",
+    "stream",
+    "stream_options",
+    "temperature",
+    "thinking",
+    "tool_choice",
+    "tools",
+    "top_logprobs",
+    "top_p",
+    "user_id"
+   ],
+   "is_free_tier": true,
+   "free_base_model": "deepseek/deepseek-v4.1-flash",
+   "zdr_route": false
+  },
+  {
+   "model_name": "tencent/hy3-free",
+   "icon": "Hunyuan.Color",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "oc",
+    "orcarouter_team",
+    "svip",
+    "vip",
+    "default",
+    "enterprise",
+    "ka",
+    "low_discount"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "display_name": "Tencent: Hy3 (Free)",
+   "context_length": 262144,
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logit_bias",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_p"
+   ],
+   "is_free_tier": true,
+   "free_base_model": "tencent/hy3",
+   "zdr_route": false
+  }
+ ],
+ "pricing_version": "c58e194db3f6a20e7d41b8c9e2f05a17"
+}

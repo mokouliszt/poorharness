@@ -1,0 +1,329 @@
+{
+ "data": [
+  {
+   "context_length": 200000,
+   "created": 1770163200,
+   "id": "olafangensan-glm-4.7-flash-heretic",
+   "model_spec": {
+    "name": "GLM 4.7 Flash Heretic",
+    "availableContextTokens": 200000,
+    "maxCompletionTokens": 24000,
+    "capabilities": {
+     "optimizedForCode": false,
+     "quantization": "fp8",
+     "supportsAudioInput": false,
+     "supportsFunctionCalling": true,
+     "supportsLogProbs": false,
+     "supportsMultipleImages": false,
+     "supportsReasoning": true,
+     "supportsReasoningEffort": true,
+     "reasoningEffortOptions": [
+      "none",
+      "low",
+      "medium",
+      "high"
+     ],
+     "defaultReasoningEffort": "low",
+     "supportsResponseSchema": true,
+     "supportsTeeAttestation": false,
+     "supportsE2EE": false,
+     "supportsVideoInput": false,
+     "supportsVision": false,
+     "supportsWebSearch": true,
+     "supportsXSearch": false
+    },
+    "pricing": {
+     "input": {
+      "usd": 0.07,
+      "diem": 0.07
+     },
+     "cache_input": {
+      "usd": 0.035,
+      "diem": 0.035
+     },
+     "output": {
+      "usd": 0.4,
+      "diem": 0.4
+     }
+    },
+    "offline": false
+   },
+   "object": "model",
+   "owned_by": "venice.ai",
+   "type": "text"
+  },
+  {
+   "context_length": 128000,
+   "created": 1775001600,
+   "id": "venice-uncensored-1-2",
+   "model_spec": {
+    "name": "Venice Uncensored 1.2",
+    "availableContextTokens": 128000,
+    "maxCompletionTokens": 8192,
+    "capabilities": {
+     "optimizedForCode": false,
+     "quantization": "fp16",
+     "supportsAudioInput": false,
+     "supportsFunctionCalling": true,
+     "supportsLogProbs": false,
+     "supportsMultipleImages": true,
+     "maxImages": 10,
+     "supportsReasoning": false,
+     "supportsReasoningEffort": false,
+     "supportsResponseSchema": true,
+     "supportsTeeAttestation": false,
+     "supportsE2EE": false,
+     "supportsVideoInput": false,
+     "supportsVision": true,
+     "supportsWebSearch": true,
+     "supportsXSearch": false
+    },
+    "pricing": {
+     "input": {
+      "usd": 0.2,
+      "diem": 0.2
+     },
+     "output": {
+      "usd": 0.9,
+      "diem": 0.9
+     }
+    },
+    "offline": false
+   },
+   "object": "model",
+   "owned_by": "venice.ai",
+   "type": "text"
+  },
+  {
+   "context_length": 128000,
+   "created": 1771545600,
+   "id": "venice-uncensored-role-play",
+   "model_spec": {
+    "name": "Venice Role Play Uncensored",
+    "availableContextTokens": 128000,
+    "maxCompletionTokens": 4096,
+    "capabilities": {
+     "optimizedForCode": false,
+     "quantization": "fp8",
+     "supportsAudioInput": false,
+     "supportsFunctionCalling": true,
+     "supportsLogProbs": false,
+     "supportsMultipleImages": true,
+     "maxImages": 10,
+     "supportsReasoning": false,
+     "supportsReasoningEffort": false,
+     "supportsResponseSchema": true,
+     "supportsTeeAttestation": false,
+     "supportsE2EE": false,
+     "supportsVideoInput": false,
+     "supportsVision": true,
+     "supportsWebSearch": true,
+     "supportsXSearch": false
+    },
+    "pricing": {
+     "input": {
+      "usd": 0.5,
+      "diem": 0.5
+     },
+     "output": {
+      "usd": 2,
+      "diem": 2
+     }
+    },
+    "offline": false
+   },
+   "object": "model",
+   "owned_by": "venice.ai",
+   "type": "text"
+  },
+  {
+   "context_length": 256000,
+   "created": 1776038400,
+   "id": "gemma-4-uncensored",
+   "model_spec": {
+    "name": "Gemma 4 Uncensored",
+    "availableContextTokens": 256000,
+    "maxCompletionTokens": 8192,
+    "capabilities": {
+     "optimizedForCode": false,
+     "quantization": "int4",
+     "supportsAudioInput": false,
+     "supportsFunctionCalling": true,
+     "supportsLogProbs": true,
+     "supportsMultipleImages": false,
+     "supportsReasoning": false,
+     "supportsReasoningEffort": false,
+     "supportsResponseSchema": true,
+     "supportsTeeAttestation": false,
+     "supportsE2EE": false,
+     "supportsVideoInput": false,
+     "supportsVision": true,
+     "supportsWebSearch": true,
+     "supportsXSearch": false
+    },
+    "pricing": {
+     "input": {
+      "usd": 0.1625,
+      "diem": 0.1625
+     },
+     "output": {
+      "usd": 0.5,
+      "diem": 0.5
+     }
+    },
+    "offline": false
+   },
+   "object": "model",
+   "owned_by": "venice.ai",
+   "type": "text"
+  },
+  {
+   "context_length": 1000000,
+   "created": 1792713600,
+   "id": "deepseek-v4-1-flash-uncensored",
+   "model_spec": {
+    "name": "DeepSeek V4.1 Flash Uncensored",
+    "availableContextTokens": 1000000,
+    "maxCompletionTokens": 131072,
+    "capabilities": {
+     "optimizedForCode": true,
+     "quantization": "fp8",
+     "supportsAudioInput": false,
+     "supportsFunctionCalling": true,
+     "supportsLogProbs": false,
+     "supportsMultipleImages": true,
+     "maxImages": 10,
+     "supportsReasoning": true,
+     "supportsReasoningEffort": true,
+     "reasoningEffortOptions": [
+      "none",
+      "low",
+      "high",
+      "max"
+     ],
+     "defaultReasoningEffort": "high",
+     "supportsResponseSchema": true,
+     "supportsTeeAttestation": false,
+     "supportsE2EE": false,
+     "supportsVideoInput": false,
+     "supportsVision": true,
+     "supportsWebSearch": true,
+     "supportsXSearch": false
+    },
+    "pricing": {
+     "input": {
+      "usd": 0.33,
+      "diem": 0.33
+     },
+     "cache_input": {
+      "usd": 0.00825,
+      "diem": 0.00825
+     },
+     "output": {
+      "usd": 1.32,
+      "diem": 1.32
+     }
+    },
+    "offline": false
+   },
+   "object": "model",
+   "owned_by": "venice.ai",
+   "type": "text"
+  },
+  {
+   "context_length": 64000,
+   "created": 1779580800,
+   "id": "e2ee-gemma-4-26b-a4b-uncensored-p",
+   "model_spec": {
+    "name": "Gemma 4 26B A4B Uncensored",
+    "availableContextTokens": 64000,
+    "maxCompletionTokens": 4096,
+    "capabilities": {
+     "optimizedForCode": false,
+     "quantization": "fp8",
+     "supportsAudioInput": false,
+     "supportsFunctionCalling": false,
+     "supportsLogProbs": false,
+     "supportsMultipleImages": false,
+     "supportsReasoning": false,
+     "supportsReasoningEffort": false,
+     "supportsResponseSchema": false,
+     "supportsTeeAttestation": true,
+     "supportsE2EE": true,
+     "supportsVideoInput": false,
+     "supportsVision": false,
+     "supportsWebSearch": true,
+     "supportsXSearch": false
+    },
+    "pricing": {
+     "input": {
+      "usd": 0.19,
+      "diem": 0.19
+     },
+     "output": {
+      "usd": 0.88,
+      "diem": 0.88
+     }
+    },
+    "offline": false
+   },
+   "object": "model",
+   "owned_by": "venice.ai",
+   "type": "text"
+  },
+  {
+   "context_length": 1000000,
+   "created": 1788652800,
+   "id": "e2ee-glm-5-3-p",
+   "model_spec": {
+    "name": "GLM 5.3",
+    "availableContextTokens": 1000000,
+    "maxCompletionTokens": 32768,
+    "capabilities": {
+     "optimizedForCode": true,
+     "quantization": "not-available",
+     "supportsAudioInput": false,
+     "supportsFunctionCalling": true,
+     "supportsLogProbs": false,
+     "supportsMultipleImages": false,
+     "supportsReasoning": true,
+     "supportsReasoningEffort": true,
+     "reasoningEffortOptions": [
+      "none",
+      "low",
+      "medium",
+      "high"
+     ],
+     "defaultReasoningEffort": "low",
+     "supportsResponseSchema": false,
+     "supportsTeeAttestation": true,
+     "supportsE2EE": true,
+     "supportsVideoInput": false,
+     "supportsVision": false,
+     "supportsWebSearch": true,
+     "supportsXSearch": false
+    },
+    "pricing": {
+     "input": {
+      "usd": 1.75,
+      "diem": 1.75
+     },
+     "cache_input": {
+      "usd": 0.325,
+      "diem": 0.325
+     },
+     "output": {
+      "usd": 5.5,
+      "diem": 5.5
+     }
+    },
+    "offline": false
+   },
+   "object": "model",
+   "owned_by": "venice.ai",
+   "type": "text"
+  }
+ ],
+ "object": "list",
+ "type": "text"
+}
