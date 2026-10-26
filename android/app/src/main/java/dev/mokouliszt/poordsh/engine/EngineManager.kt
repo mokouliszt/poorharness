@@ -34,6 +34,7 @@ class EngineManager(
     backendList: List<AgentBackend>,
     private val cacheDir: File,
     private val keepalive: Keepalive,
+    appVersion: String = "",
 ) {
     val backends: Map<String, AgentBackend> = backendList.associateBy { it.id }
 
@@ -51,6 +52,7 @@ class EngineManager(
 
     init {
         cacheDir.mkdirs()
+        dropStaleCatalogs(cacheDir, appVersion)
         for (b in backendList) {
             b.setRecoveryPolicy { hasActivity(b.id) }
             scope.launch {
@@ -235,6 +237,19 @@ class EngineManager(
     }
 
     companion object {
+        /**
+         * The cached model lists were written by the app version that last ran, and a newer
+         * one may report more per model (a price, a badge). An engine only refreshes its list
+         * when it starts, which an update does not do; so a list from another version is
+         * dropped, and [discoverMissing] learns it again.
+         */
+        fun dropStaleCatalogs(cacheDir: File, appVersion: String) {
+            val marker = File(cacheDir, "app-version")
+            if (marker.isFile && marker.readText() == appVersion) return
+            cacheDir.listFiles { f -> f.isFile && f.name.startsWith("models-") && f.name.endsWith(".json") }?.forEach { it.delete() }
+            marker.writeText(appVersion)
+        }
+
         /** How long an engine stays up after its last turn, so a quick follow-up does not wait for a start. */
         const val IDLE_STOP_MS = 60_000L
     }

@@ -112,7 +112,7 @@ class AppGraph(context: Context) {
         plugins = { plugins.state() },
         gitRepos = { s3() != null },
     )
-    val engines = EngineManager(runtime, listOf(opencode), File(context.filesDir, "cache"), keepalive)
+    val engines = EngineManager(runtime, listOf(opencode), File(context.filesDir, "cache"), keepalive, BuildConfig.VERSION_NAME)
     val chatStore = ChatStore(File(context.filesDir, "chats"))
 
     /** Files agents hand over: in the Ubuntu home's `outputs` folder, or the bucket's `outputs` folder. */

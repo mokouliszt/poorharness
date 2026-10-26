@@ -36,3 +36,9 @@ model that needs a newer engine appears once the engine is updated from
 Settings ([engine-updates](engine-updates.md)). The wait relies on where
 opencode keeps its copy (`~/.cache/opencode/models*.json`); if that moves, the
 app simply does not wait, and a new model shows one start later.
+
+The cached list is also dropped when the app version changes
+(`EngineManager.dropStaleCatalogs`): an update does not start an engine, so
+without this the picker would keep showing what the previous version stored (a
+price or badge added since would be missing) until the next chat. Discovery then
+starts the engine once and learns the list again.
