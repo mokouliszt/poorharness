@@ -34,8 +34,9 @@ reasons behind them are in [`docs/adr/`](adr/README.md).
    should list exactly those models. If a catalog's field names change, that
    gateway's `parse` and its fixture (`src/test/resources/<id>/`) follow. For
    Venice also check `reasoningEffortOptions` against the variants, that the
-   `chat` agent still removes tools (`tools` absent from the request) and that
-   the five ids are still listed.
+   `chat` agent still removes tools (`tools` absent from the request), and that
+   `uncensored`, `privacy` and `pricing` (USD per million tokens) keep their
+   meaning: the live whitelist should match the caps in `Venice.kt`.
 8. Re-check plugins ([plugins](adr/plugins.md)): start opencode with `android/app/build/opencode-plugins-config.json` (written by
    `OpencodePluginsTest`, `"*"` moved first as on Android, the MCP URL pointed at
    a local server); `GET /skill`, `GET /mcp` and `GET /agent` should list the

@@ -26,7 +26,7 @@ can be followed. Procedures that are not decisions are in
 - [NVIDIA NIM through opencode's own provider](nvidia-nim.md)
 - [OrcaRouter's free models, listed by OrcaRouter](orcarouter-free-models.md)
 - [Infron's free models, with the provider defined by the app](infron-free-models.md)
-- [Venice's five uncensored models, with the provider defined by the app](venice.md)
+- [Venice's uncensored models under a price cap, with the provider defined by the app](venice.md)
 - [The app is PoorHarness; its identifiers keep the old name](app-name.md)
 - [Engine options: useful features off by default, and subagents](engine-options.md)
 - [Skills live in one place, read where they are used](skills.md)

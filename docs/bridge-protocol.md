@@ -374,9 +374,12 @@ reads them; opencode stores them as synthetic and its own UIs hide them.
   the request body when the prompt names the variant.
 - Venice ([venice](adr/venice.md)): not reached through models.dev's npm package,
   so `provider.venice` has `npm: "@ai-sdk/openai-compatible"`, `name`,
-  `options.baseURL: "https://api.venice.ai/api/v1"` and a `whitelist` of the
-  five ids; the key comes from the auth store. Models from `GET
-  https://api.venice.ai/api/v1/models` (no key): `model_spec.name`,
+  `options.baseURL: "https://api.venice.ai/api/v1"` and a `whitelist`; the key
+  comes from the auth store. Models from `GET
+  https://api.venice.ai/api/v1/models` (no key), kept when `model_spec.uncensored`
+  is true, `model_spec.privacy` is `private`, the model is online and both USD
+  prices per million tokens are at most 0.35 (input) and 1.5 (output); fields:
+  `model_spec.name`,
   `availableContextTokens`, `maxCompletionTokens`, `pricing`,
   `capabilities.supportsFunctionCalling` / `supportsReasoning` /
   `reasoningEffortOptions` / `supportsVision`, `offline`. Variants are

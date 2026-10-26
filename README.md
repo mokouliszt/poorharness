@@ -21,10 +21,13 @@ start. Optional:
   - an NVIDIA NIM key, for the models on NVIDIA's API;
   - an OrcaRouter key, for OrcaRouter's free models (only those are listed);
   - an Infron key, for Infron's free models (only those are listed);
-  - a [Venice](https://venice.ai) key, for five of its paid models (DeepSeek V4.1
-    Flash Uncensored, GLM 4.7 Flash Heretic, Gemma 4 Uncensored, Venice Uncensored
-    1.2 and E2EE Gemma 4 26B). Venice charges per token. E2EE Gemma cannot call
-    tools, so it is chat only, and the app does not encrypt on the client side.
+  - a [Venice](https://venice.ai) key, for its paid models that Venice marks
+    uncensored and private and that cost at most $0.35 in and $1.50 out per
+    million tokens (five in October 2026: DeepSeek V4.1 Flash Uncensored, GLM 4.7
+    Flash Heretic, Gemma 4 Uncensored, Venice Uncensored 1.2 and E2EE Gemma 4
+    26B). The list follows Venice, and the picker shows each price. E2EE Gemma
+    cannot call tools, so it is chat only, and the app does not encrypt on the
+    client side.
 - **An S3-compatible bucket** (AWS S3, Cloudflare R2, Backblaze B2, MinIO and
   the like) keeps the files agents hand over, and git repositories for them.
 

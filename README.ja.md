@@ -15,7 +15,7 @@ Android端末から操作するコーディングエージェントです。公�
   - NVIDIA NIMのキー：NVIDIAのAPIで提供されるモデル
   - OrcaRouterのキー：OrcaRouterの無料モデル（無料のものだけを表示します）
   - Infronのキー：Infronの無料モデル（無料のものだけを表示します）
-  - [Venice](https://venice.ai) のキー：有料モデル5種（DeepSeek V4.1 Flash Uncensored、GLM 4.7 Flash Heretic、Gemma 4 Uncensored、Venice Uncensored 1.2、E2EE Gemma 4 26B）。従量課金です。E2EE Gemmaはツール呼び出しに対応しないためチャット専用で、アプリ側でのクライアント暗号化は行いません。
+  - [Venice](https://venice.ai) のキー：Veniceが無検閲（uncensored）かつプライベートとしているモデルのうち、100万トークンあたり入力$0.35・出力$1.50以下の有料モデル（2026年10月時点で5種：DeepSeek V4.1 Flash Uncensored、GLM 4.7 Flash Heretic、Gemma 4 Uncensored、Venice Uncensored 1.2、E2EE Gemma 4 26B）。一覧はVeniceに追従し、選択画面に価格を表示します。E2EE Gemmaはツール呼び出しに対応しないためチャット専用で、アプリ側でのクライアント暗号化は行いません。
 - **S3互換ストレージ**（AWS S3、Cloudflare R2、Backblaze B2、MinIOなど）：エージェントが受け渡すファイルと、エージェント用のgitリポジトリを保存します。
 
 <p align="center"><img src="docs/screenshots.ja.png" width="760" alt="ファイルを2つ添付したホーム画面の入力欄、エージェントが受け渡したファイルのあるチャット、サブエージェントのモデルを選ぶオプション、バケットに保存したgitリポジトリの一覧"></p>

@@ -1,11 +1,25 @@
 {
+ "object": "list",
  "data": [
   {
    "context_length": 200000,
    "created": 1770163200,
    "id": "olafangensan-glm-4.7-flash-heretic",
    "model_spec": {
-    "name": "GLM 4.7 Flash Heretic",
+    "pricing": {
+     "input": {
+      "usd": 0.07,
+      "diem": 0.07
+     },
+     "cache_input": {
+      "usd": 0.035,
+      "diem": 0.035
+     },
+     "output": {
+      "usd": 0.4,
+      "diem": 0.4
+     }
+    },
     "availableContextTokens": 200000,
     "maxCompletionTokens": 24000,
     "capabilities": {
@@ -32,21 +46,13 @@
      "supportsWebSearch": true,
      "supportsXSearch": false
     },
-    "pricing": {
-     "input": {
-      "usd": 0.07,
-      "diem": 0.07
-     },
-     "cache_input": {
-      "usd": 0.035,
-      "diem": 0.035
-     },
-     "output": {
-      "usd": 0.4,
-      "diem": 0.4
-     }
-    },
-    "offline": false
+    "description": "GLM-4.7-Flash-Heretic is an uncensored experimental variant of GLM-4.7-Flash, optimized for creative freedom and unfiltered dialogue with fast inference speed.",
+    "name": "GLM 4.7 Flash Heretic",
+    "modelSource": "https://huggingface.co/Olafangensan/GLM-4.7-Flash-heretic",
+    "offline": false,
+    "privacy": "private",
+    "traits": [],
+    "uncensored": true
    },
    "object": "model",
    "owned_by": "venice.ai",
@@ -57,7 +63,19 @@
    "created": 1775001600,
    "id": "venice-uncensored-1-2",
    "model_spec": {
-    "name": "Venice Uncensored 1.2",
+    "pricing": {
+     "input": {
+      "usd": 0.2,
+      "diem": 0.2
+     },
+     "output": {
+      "usd": 0.9,
+      "diem": 0.9
+     }
+    },
+    "model_sets": [
+     "venice_recommendations"
+    ],
     "availableContextTokens": 128000,
     "maxCompletionTokens": 8192,
     "capabilities": {
@@ -78,17 +96,15 @@
      "supportsWebSearch": true,
      "supportsXSearch": false
     },
-    "pricing": {
-     "input": {
-      "usd": 0.2,
-      "diem": 0.2
-     },
-     "output": {
-      "usd": 0.9,
-      "diem": 0.9
-     }
-    },
-    "offline": false
+    "description": "Venice Uncensored 1.2 is designed for maximum creative freedom and authentic interaction. Built for open-ended exploration, roleplay, and unfiltered dialogue with improved capabilities over 1.1.",
+    "name": "Venice Uncensored 1.2",
+    "modelSource": "https://huggingface.co/cognitivecomputations/Dolphin-Mistral-24B-Venice-Edition",
+    "offline": false,
+    "privacy": "private",
+    "traits": [
+     "most_uncensored"
+    ],
+    "uncensored": true
    },
    "object": "model",
    "owned_by": "venice.ai",
@@ -99,7 +115,16 @@
    "created": 1771545600,
    "id": "venice-uncensored-role-play",
    "model_spec": {
-    "name": "Venice Role Play Uncensored",
+    "pricing": {
+     "input": {
+      "usd": 0.5,
+      "diem": 0.5
+     },
+     "output": {
+      "usd": 2,
+      "diem": 2
+     }
+    },
     "availableContextTokens": 128000,
     "maxCompletionTokens": 4096,
     "capabilities": {
@@ -120,17 +145,13 @@
      "supportsWebSearch": true,
      "supportsXSearch": false
     },
-    "pricing": {
-     "input": {
-      "usd": 0.5,
-      "diem": 0.5
-     },
-     "output": {
-      "usd": 2,
-      "diem": 2
-     }
-    },
-    "offline": false
+    "description": "Optimized for creative roleplay scenarios with maximum freedom. Designed for immersive storytelling, character interactions, and open-ended creative writing.",
+    "name": "Venice Role Play Uncensored",
+    "modelSource": "https://huggingface.co/dphnAI/24B-3.2-RP-K2-final",
+    "offline": false,
+    "privacy": "private",
+    "traits": [],
+    "uncensored": true
    },
    "object": "model",
    "owned_by": "venice.ai",
@@ -141,7 +162,16 @@
    "created": 1776038400,
    "id": "gemma-4-uncensored",
    "model_spec": {
-    "name": "Gemma 4 Uncensored",
+    "pricing": {
+     "input": {
+      "usd": 0.1625,
+      "diem": 0.1625
+     },
+     "output": {
+      "usd": 0.5,
+      "diem": 0.5
+     }
+    },
     "availableContextTokens": 256000,
     "maxCompletionTokens": 8192,
     "capabilities": {
@@ -161,17 +191,13 @@
      "supportsWebSearch": true,
      "supportsXSearch": false
     },
-    "pricing": {
-     "input": {
-      "usd": 0.1625,
-      "diem": 0.1625
-     },
-     "output": {
-      "usd": 0.5,
-      "diem": 0.5
-     }
-    },
-    "offline": false
+    "description": "Gemma 4 Uncensored is an uncensored variant of Google Gemma 4 26B, a Mixture-of-Experts model with 26B total parameters and only 4B active per token. Fine-tuned for uncensored chat without content filtering, it supports 256K context, coding, and general-purpose conversation.",
+    "name": "Gemma 4 Uncensored",
+    "modelSource": "https://huggingface.co/Jiunsong/supergemma4-26b-uncensored-gguf-v2",
+    "offline": false,
+    "privacy": "private",
+    "traits": [],
+    "uncensored": true
    },
    "object": "model",
    "owned_by": "venice.ai",
@@ -182,7 +208,20 @@
    "created": 1792713600,
    "id": "deepseek-v4-1-flash-uncensored",
    "model_spec": {
-    "name": "DeepSeek V4.1 Flash Uncensored",
+    "pricing": {
+     "input": {
+      "usd": 0.33,
+      "diem": 0.33
+     },
+     "cache_input": {
+      "usd": 0.00825,
+      "diem": 0.00825
+     },
+     "output": {
+      "usd": 1.32,
+      "diem": 1.32
+     }
+    },
     "availableContextTokens": 1000000,
     "maxCompletionTokens": 131072,
     "capabilities": {
@@ -210,21 +249,13 @@
      "supportsWebSearch": true,
      "supportsXSearch": false
     },
-    "pricing": {
-     "input": {
-      "usd": 0.33,
-      "diem": 0.33
-     },
-     "cache_input": {
-      "usd": 0.00825,
-      "diem": 0.00825
-     },
-     "output": {
-      "usd": 1.32,
-      "diem": 1.32
-     }
-    },
-    "offline": false
+    "description": "DeepSeek V4.1 Flash Uncensored is an abliterated, uncensored variant of DeepSeek V4.1 Flash, a multimodal Mixture-of-Experts model with 552B backbone parameters (8B active on input, 16B on output) and a 1M-token context window. It natively processes images and text, with strong reasoning, coding, and agentic performance and no content-filtering guardrails.",
+    "name": "DeepSeek V4.1 Flash Uncensored",
+    "modelSource": "https://huggingface.co/dealignai/DeepSeek-V4.1-Flash-UNCENSORED-FP8",
+    "offline": false,
+    "privacy": "private",
+    "traits": [],
+    "uncensored": true
    },
    "object": "model",
    "owned_by": "venice.ai",
@@ -235,7 +266,16 @@
    "created": 1779580800,
    "id": "e2ee-gemma-4-26b-a4b-uncensored-p",
    "model_spec": {
-    "name": "Gemma 4 26B A4B Uncensored",
+    "pricing": {
+     "input": {
+      "usd": 0.19,
+      "diem": 0.19
+     },
+     "output": {
+      "usd": 0.88,
+      "diem": 0.88
+     }
+    },
     "availableContextTokens": 64000,
     "maxCompletionTokens": 4096,
     "capabilities": {
@@ -255,17 +295,13 @@
      "supportsWebSearch": true,
      "supportsXSearch": false
     },
-    "pricing": {
-     "input": {
-      "usd": 0.19,
-      "diem": 0.19
-     },
-     "output": {
-      "usd": 0.88,
-      "diem": 0.88
-     }
-    },
-    "offline": false
+    "description": "Gemma 4 26B A4B Uncensored running in a Trusted Execution Environment (TEE). An uncensored variant of Google's Gemma 4 MoE model with 25.2B total / 3.8B active parameters, supporting multimodal input across text and images, with hardware attestation evidence available for independent verification.",
+    "name": "Gemma 4 26B A4B Uncensored",
+    "modelSource": "https://huggingface.co/coder3101/gemma-4-26B-A4B-it-heretic",
+    "offline": false,
+    "privacy": "private",
+    "traits": [],
+    "uncensored": true
    },
    "object": "model",
    "owned_by": "venice.ai",
@@ -276,7 +312,20 @@
    "created": 1788652800,
    "id": "e2ee-glm-5-3-p",
    "model_spec": {
-    "name": "GLM 5.3",
+    "pricing": {
+     "input": {
+      "usd": 1.75,
+      "diem": 1.75
+     },
+     "cache_input": {
+      "usd": 0.325,
+      "diem": 0.325
+     },
+     "output": {
+      "usd": 5.5,
+      "diem": 5.5
+     }
+    },
     "availableContextTokens": 1000000,
     "maxCompletionTokens": 32768,
     "capabilities": {
@@ -303,27 +352,150 @@
      "supportsWebSearch": true,
      "supportsXSearch": false
     },
+    "description": "GLM 5.3 running in a Trusted Execution Environment (TEE). Z.ai's flagship model with 1M context. Hardware attestation evidence is available for independent verification of enclave identity and configuration.",
+    "name": "GLM 5.3",
+    "modelSource": "https://huggingface.co/zai-org/GLM-5.3",
+    "offline": false,
+    "privacy": "private",
+    "traits": []
+   },
+   "object": "model",
+   "owned_by": "venice.ai",
+   "type": "text"
+  },
+  {
+   "context_length": 1000000,
+   "created": 1775433600,
+   "id": "qwen-3-6-plus",
+   "model_spec": {
     "pricing": {
      "input": {
-      "usd": 1.75,
-      "diem": 1.75
+      "usd": 0.625,
+      "diem": 0.625
      },
      "cache_input": {
-      "usd": 0.325,
-      "diem": 0.325
+      "usd": 0.0625,
+      "diem": 0.0625
+     },
+     "cache_write": {
+      "usd": 0.78,
+      "diem": 0.78
      },
      "output": {
-      "usd": 5.5,
-      "diem": 5.5
+      "usd": 3.75,
+      "diem": 3.75
+     },
+     "extended": {
+      "context_token_threshold": 256000,
+      "input": {
+       "usd": 2.5,
+       "diem": 2.5
+      },
+      "output": {
+       "usd": 7.5,
+       "diem": 7.5
+      },
+      "cache_input": {
+       "usd": 0.0625,
+       "diem": 0.0625
+      },
+      "cache_write": {
+       "usd": 0.78,
+       "diem": 0.78
+      }
      }
     },
-    "offline": false
+    "availableContextTokens": 1000000,
+    "maxCompletionTokens": 65536,
+    "capabilities": {
+     "optimizedForCode": true,
+     "quantization": "not-available",
+     "supportsAudioInput": false,
+     "supportsFunctionCalling": true,
+     "supportsLogProbs": false,
+     "supportsMultipleImages": true,
+     "maxImages": 10,
+     "supportsReasoning": true,
+     "supportsReasoningEffort": false,
+     "supportsResponseSchema": true,
+     "supportsTeeAttestation": false,
+     "supportsE2EE": false,
+     "supportsVideoInput": true,
+     "supportsVision": true,
+     "supportsWebSearch": true,
+     "supportsXSearch": false
+    },
+    "constraints": {
+     "temperature": {
+      "default": 0.7
+     },
+     "top_p": {
+      "default": 0.8
+     }
+    },
+    "description": "Qwen 3.6 Plus Uncensored is Alibaba's latest flagship reasoning model with exceptional performance across coding, reasoning, and general knowledge tasks. Features mixed reasoning, function calling, and multimodal input support.",
+    "name": "Qwen 3.6 Plus Uncensored",
+    "modelSource": "https://www.alibabacloud.com/blog/qwen3-6-plus-towards-real-world-agents_603005",
+    "offline": false,
+    "privacy": "anonymized",
+    "traits": [],
+    "uncensored": true
+   },
+   "object": "model",
+   "owned_by": "venice.ai",
+   "type": "text"
+  },
+  {
+   "context_length": 128000,
+   "created": 1762387200,
+   "id": "openai-gpt-oss-120b",
+   "model_spec": {
+    "pricing": {
+     "input": {
+      "usd": 0.07,
+      "diem": 0.07
+     },
+     "output": {
+      "usd": 0.3,
+      "diem": 0.3
+     }
+    },
+    "availableContextTokens": 128000,
+    "maxCompletionTokens": 16384,
+    "capabilities": {
+     "optimizedForCode": false,
+     "quantization": "not-available",
+     "supportsAudioInput": false,
+     "supportsFunctionCalling": true,
+     "supportsLogProbs": false,
+     "supportsMultipleImages": false,
+     "supportsReasoning": true,
+     "supportsReasoningEffort": true,
+     "reasoningEffortOptions": [
+      "none",
+      "low",
+      "medium",
+      "high"
+     ],
+     "defaultReasoningEffort": "low",
+     "supportsResponseSchema": false,
+     "supportsTeeAttestation": false,
+     "supportsE2EE": false,
+     "supportsVideoInput": false,
+     "supportsVision": false,
+     "supportsWebSearch": true,
+     "supportsXSearch": false
+    },
+    "description": "gpt-oss-120b is an open-weight, 117B-parameter Mixture-of-Experts (MoE) language model from OpenAI designed for high-reasoning, agentic, and general-purpose production use cases. The model supports configurable reasoning depth, full chain-of-thought access, and native tool use, including function calling, browsing, and structured output generation",
+    "name": "OpenAI GPT OSS 120B",
+    "modelSource": "https://huggingface.co/openai/gpt-oss-120b",
+    "offline": false,
+    "privacy": "private",
+    "traits": []
    },
    "object": "model",
    "owned_by": "venice.ai",
    "type": "text"
   }
- ],
- "object": "list",
- "type": "text"
+ ]
 }

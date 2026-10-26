@@ -774,7 +774,10 @@ class OpencodeBackend(
                         "chatOnly" to chat,
                         "isDefault" to (defaults.str(pid) == mid),
                         "available" to true,
-                        "description" to null,
+                        // Venice bills per token, so the picker shows what a model costs.
+                        "description" to if (pid == Venice.PROVIDER && cost != null) {
+                            Venice.priceLabel(cost.optDouble("input").takeIf { !it.isNaN() }, cost.optDouble("output").takeIf { !it.isNaN() })
+                        } else null,
                     ),
                 )
             }

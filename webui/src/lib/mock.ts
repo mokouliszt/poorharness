@@ -91,11 +91,11 @@ export function createMockHost(emit: Emit) {
           m("opencode:infron/qwen/qwen3.8-27b:free", "opencode", "infron", "Infron", "Qwen3.8 27B Uncensored", false, INFRON_EFFORTS, null, false, true, null, 204_000),
           ] : []),
           ...(keys.venice ? [
-          m("opencode:venice/deepseek-v4-1-flash-uncensored", "opencode", "venice", "Venice", "DeepSeek V4.1 Flash Uncensored", false, ["none", "low", "high", "max"], null, false, true, null, 1_000_000),
-          m("opencode:venice/olafangensan-glm-4.7-flash-heretic", "opencode", "venice", "Venice", "GLM 4.7 Flash Heretic", false, ["none", "low", "medium", "high"], null, false, true, null, 200_000),
-          m("opencode:venice/gemma-4-uncensored", "opencode", "venice", "Venice", "Gemma 4 Uncensored", false, [], null, false, true, null, 256_000),
-          { ...m("opencode:venice/e2ee-gemma-4-26b-a4b-uncensored-p", "opencode", "venice", "Venice", "Gemma 4 26B A4B Uncensored", false, [], null, false, true, null, 64_000), chatOnly: true },
-          m("opencode:venice/venice-uncensored-1-2", "opencode", "venice", "Venice", "Venice Uncensored 1.2", false, [], null, false, true, null, 128_000),
+          m("opencode:venice/deepseek-v4-1-flash-uncensored", "opencode", "venice", "Venice", "DeepSeek V4.1 Flash Uncensored", false, ["none", "low", "high", "max"], null, false, true, "$0.33 in · $1.32 out / 1M", 1_000_000),
+          m("opencode:venice/olafangensan-glm-4.7-flash-heretic", "opencode", "venice", "Venice", "GLM 4.7 Flash Heretic", false, ["none", "low", "medium", "high"], null, false, true, "$0.07 in · $0.4 out / 1M", 200_000),
+          m("opencode:venice/gemma-4-uncensored", "opencode", "venice", "Venice", "Gemma 4 Uncensored", false, [], null, false, true, "$0.163 in · $0.5 out / 1M", 256_000),
+          { ...m("opencode:venice/e2ee-gemma-4-26b-a4b-uncensored-p", "opencode", "venice", "Venice", "Gemma 4 26B A4B Uncensored", false, [], null, false, true, "$0.19 in · $0.88 out / 1M", 64_000), chatOnly: true },
+          m("opencode:venice/venice-uncensored-1-2", "opencode", "venice", "Venice", "Venice Uncensored 1.2", false, [], null, false, true, "$0.2 in · $0.9 out / 1M", 128_000),
           ] : []),
         ];
   if (pending.length) {
