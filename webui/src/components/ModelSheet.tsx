@@ -4,9 +4,11 @@ import { Sheet } from "./ui/Sheet";
 import {
   chooseModel,
   chooseSubagentModel,
+  chooseTitleModel,
   setModelSheet,
   setProviderKeySheet,
   setSubagentSheet,
+  setTitleSheet,
   takePickerOpenGroup,
   useStore,
   type ProviderKey,
@@ -30,19 +32,27 @@ const KEYED = [
  * list is whatever opencode's catalog says. Any model can be picked inside a chat.
  *
  * [target] "subagent" picks the model subagents run on (docs/adr/subagent-model.md),
- * from the same list, with a first row that keeps them on the chat's model.
+ * and "title" the one chat titles are written with (docs/adr/title-model.md), from
+ * the same list, with a first row that keeps them on the chat's model. A title takes
+ * no reasoning level: opencode writes it with the model's lightest settings.
  */
-export function ModelSheet({ target = "chat" }: { target?: "chat" | "subagent" }) {
+export function ModelSheet({ target = "chat" }: { target?: "chat" | "subagent" | "title" }) {
   const t = useT();
   const forSubagents = target === "subagent";
-  const open = useStore((s) => (forSubagents ? s.subagentSheet : s.modelSheet));
+  const forTitles = target === "title";
+  // A setting, not the chat's model: "Same as the chat" first, no keys added from here.
+  const forSetting = forSubagents || forTitles;
+  const open = useStore((s) => (forSubagents ? s.subagentSheet : forTitles ? s.titleSheet : s.modelSheet));
   const models = useStore((s) => s.models);
   const errors = useStore((s) => s.modelErrors);
   const pending = useStore((s) => s.modelsPending);
-  const selected = useStore((s) => (forSubagents ? s.settings?.subagentModel ?? null : s.model));
-  const effort = useStore((s) => (forSubagents ? s.settings?.subagentEffort ?? null : s.effort));
-  const close = () => (forSubagents ? setSubagentSheet(false) : setModelSheet(false));
-  const choose = (id: string | null, e: string | null) => (forSubagents ? void chooseSubagentModel(id, e) : chooseModel(id!, e));
+  const selected = useStore((s) =>
+    forSubagents ? s.settings?.subagentModel ?? null : forTitles ? s.settings?.titleModel ?? null : s.model,
+  );
+  const effort = useStore((s) => (forSubagents ? s.settings?.subagentEffort ?? null : forTitles ? null : s.effort));
+  const close = () => (forSubagents ? setSubagentSheet(false) : forTitles ? setTitleSheet(false) : setModelSheet(false));
+  const choose = (id: string | null, e: string | null) =>
+    forSubagents ? void chooseSubagentModel(id, e) : forTitles ? void chooseTitleModel(id) : chooseModel(id!, e);
   const keys = useStore((s) => s.accounts?.opencode?.keys ?? EMPTY_KEYS);
   const [query, setQuery] = useState("");
 
@@ -56,7 +66,7 @@ export function ModelSheet({ target = "chat" }: { target?: "chat" | "subagent" }
       m.providerName.toLowerCase().includes(q) ||
       // "free" (or 無料) finds the free models even when their ids do not say so.
       (m.free && (freeWord.includes(q) || "free".includes(q)));
-    // Subagents use tools; a model that cannot call them is no subagent model.
+    // Subagents use tools; a model that cannot call them is no subagent model. Titles use none.
     const list = models.filter(match).filter((m) => !(forSubagents && m.chatOnly));
     const out: { key: string; label: string; items: ModelInfo[]; addKey?: ProviderKey }[] = [];
     // OpenCode's own models (Zen): the free ones first, then any a Zen key adds.
@@ -75,9 +85,9 @@ export function ModelSheet({ target = "chat" }: { target?: "chat" | "subagent" }
     for (const k of KEYED) {
       if (!keys.includes(k.id) && !q && !byProvider.has(k.id)) out.push({ key: `p:${k.id}`, label: t(k.label), items: [], addKey: k.id });
     }
-    // Adding a key is the chat picker's job; subagents pick from what is there.
-    return forSubagents ? out.filter((g) => g.items.length > 0) : out;
-  }, [models, query, keys, t, forSubagents]);
+    // Adding a key is the chat picker's job; a setting picks from what is there.
+    return forSetting ? out.filter((g) => g.items.length > 0) : out;
+  }, [models, query, keys, t, forSubagents, forSetting]);
 
   const current = models.find((m) => m.id === selected);
   const mixed = new Set(groups.filter((g) => g.items.some((m) => m.free) && g.items.some((m) => !m.free)).map((g) => g.key));
@@ -113,7 +123,7 @@ export function ModelSheet({ target = "chat" }: { target?: "chat" | "subagent" }
     searching ? setClosedInSearch((prev) => flip(prev, key)) : setExpanded((prev) => flip(prev, key));
 
   return (
-    <Sheet open={open} onClose={close} title={t(forSubagents ? "subagentModel.title" : "models.title")}>
+    <Sheet open={open} onClose={close} title={t(forSubagents ? "subagentModel.title" : forTitles ? "titleModel.title" : "models.title")}>
       <div className="px-4 pb-2">
         <label className="flex h-10 items-center gap-2 rounded-full bg-raised px-3">
           <Search size={15} className="text-mute" />
@@ -138,7 +148,7 @@ export function ModelSheet({ target = "chat" }: { target?: "chat" | "subagent" }
             {t("models.loadingShort")}
           </p>
         ))}
-        {forSubagents && !searching && (
+        {forSetting && !searching && (
           <button
             onClick={() => {
               choose(null, null);
@@ -178,7 +188,7 @@ export function ModelSheet({ target = "chat" }: { target?: "chat" | "subagent" }
                   {!isOpen && g.items.some((m) => m.id === selected) && <Check size={14} className="ml-auto shrink-0 text-paper" />}
                 </button>
               )}
-              {g.addKey && !forSubagents && (
+              {g.addKey && !forSetting && (
                 <button className="text-xs font-medium text-paper underline underline-offset-4" onClick={() => setProviderKeySheet(g.addKey!)}>
                   {t("models.addKey")}
                 </button>
@@ -189,9 +199,9 @@ export function ModelSheet({ target = "chat" }: { target?: "chat" | "subagent" }
                 key={m.id}
                 disabled={!m.available}
                 onClick={() => {
-                  const keep = effort && m.efforts.includes(effort) ? effort : m.defaultEffort;
+                  const keep = forTitles ? null : effort && m.efforts.includes(effort) ? effort : m.defaultEffort;
                   choose(m.id, keep);
-                  if (!m.efforts.length) close();
+                  if (forTitles || !m.efforts.length) close();
                 }}
                 className={cn(
                   "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left disabled:opacity-40",
@@ -218,7 +228,7 @@ export function ModelSheet({ target = "chat" }: { target?: "chat" | "subagent" }
         })}
       </div>
 
-      {current && current.efforts.length > 0 && (
+      {current && current.efforts.length > 0 && !forTitles && (
         <div className="border-t border-line px-4 pt-3">
           <div className="mb-2 text-xs font-medium uppercase tracking-wider text-mute">{t("models.effort")}</div>
           <div className="scroll-quiet flex gap-2 overflow-x-auto pb-1">

@@ -72,6 +72,13 @@ reasons behind them are in [`docs/adr/`](adr/README.md).
     return `{title, output, metadata, attachments}`. `WebScriptTest` and
     `TinyFishTest` cover the script and the client; to try it for real, run
     `poordsh-web.py` in a Tensorlake test sandbox the way the plugin does.
+14. Re-check the title model ([title-model](adr/title-model.md)): opencode still
+    writes titles with the hidden `title` agent and takes `agent.title.model`
+    from config (`SessionPrompt.ensureTitle`), still sends no tools and no
+    variant for it, and still picks a small model only by `small_model` and the
+    families listed in the ADR. To try it, point two OpenAI-compatible providers
+    at a local server that records requests, set `agent.title.model` to one and
+    chat on the other: the "Generate a title" request should reach the first.
 
 ## Following skill-creator
 

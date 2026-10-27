@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronRight, SlidersHorizontal } from "lucide-react";
-import { setOption, setOptionsSheet, setSubagentSheet, toast, useStore } from "@/lib/store";
+import { setOption, setOptionsSheet, setSubagentSheet, setTitleSheet, toast, useStore } from "@/lib/store";
 import { describeError, useT, type TKey } from "@/lib/i18n";
 import { Sheet } from "./ui/Sheet";
 import { Switch } from "./ui/Switch";
@@ -9,7 +9,8 @@ import { cn } from "@/lib/cn";
 /**
  * opencode's switchable features. The host owns the list, their defaults and how
  * each one is applied (docs/adr/engine-options.md); this only shows them and which
- * are on. Under subagents: the model they run on (docs/adr/subagent-model.md).
+ * are on. Under subagents: the model they run on (docs/adr/subagent-model.md). Last,
+ * the model chat titles are written with (docs/adr/title-model.md).
  */
 export function OptionsSheet() {
   const t = useT();
@@ -26,6 +27,11 @@ export function OptionsSheet() {
     const name = s.models.find((m) => m.id === id)?.name ?? id.slice(id.indexOf("/") + 1);
     const effort = s.settings?.subagentEffort;
     return effort ? `${name} · ${effort}` : name;
+  });
+  const titleModel = useStore((s) => {
+    const id = s.settings?.titleModel;
+    if (!id) return null;
+    return s.models.find((m) => m.id === id)?.name ?? id.slice(id.indexOf("/") + 1);
   });
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -81,6 +87,18 @@ export function OptionsSheet() {
               </div>
             );
           })
+        )}
+        {items.length > 0 && (
+          <button
+            onClick={() => setTitleSheet(true)}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left active:bg-raised"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="text-base text-paper">{t("titleModel.title")}</div>
+              <div className="truncate text-xs text-mute">{titleModel ?? t("subagentModel.same")}</div>
+            </div>
+            <ChevronRight size={16} className="shrink-0 text-mute" />
+          </button>
         )}
         {items.length > 0 && running && <p className="px-3 pt-1 text-xs text-mute">{t("options.applyLater")}</p>}
       </div>

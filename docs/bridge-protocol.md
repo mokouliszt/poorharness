@@ -131,7 +131,7 @@ JSON with `chatId`, except `/repo` and `/web`.
 | `files.list` | `{sessionId, path?}` | `{path, entries[{name, dir, size, modifiedAt}], missing?}` — folders first; `missing` when the chat has no sandbox (never ran, or Tensorlake deleted it) |
 | `files.export` | `{sessionId, path, action: "save" \| "share"}` | `{where: "downloads" \| "share", name}` — saved to `Download/PoorHarness` (Android 10+) or offered to the share sheet |
 | `files.zip` | `{sessionId, action}` | same; the whole workspace without `node_modules`, `.venv`, `venv`, `__pycache__` |
-| `settings.get` / `settings.set` | – / partial `Settings` | `Settings` (`autoUpdate`: install newer engine releases found at launch; turning it on installs them at once. `systemPrompt`: given to opencode from the next message, `system_prompt_too_long` past 20,000 characters. `subagentModel` (`"opencode:<provider>/<model>"` or null for the chat's) and `subagentEffort`: what subagents run on, from opencode's next start, [subagent-model](adr/subagent-model.md)) |
+| `settings.get` / `settings.set` | – / partial `Settings` | `Settings` (`autoUpdate`: install newer engine releases found at launch; turning it on installs them at once. `systemPrompt`: given to opencode from the next message, `system_prompt_too_long` past 20,000 characters. `subagentModel` (`"opencode:<provider>/<model>"` or null for the chat's) and `subagentEffort`: what subagents run on, from opencode's next start, [subagent-model](adr/subagent-model.md). `titleModel` (same form, or null): what writes chat titles, from opencode's next start, [title-model](adr/title-model.md)) |
 | `updates.check` | – | `{opencode: ToolUpdateInfo}` |
 | `updates.last` | – | the check run when the app opened, same shape, or `null` if none ran yet |
 | `updates.apply` / `updates.reset` | `{tool}` | `{version}` / – |
@@ -297,6 +297,10 @@ reads them; opencode stores them as synthetic and its own UIs hide them.
   "<provider>/<model>"` and, with a level, `variant`; only those fields, so
   opencode's own prompts and permissions stay. Left out when the provider has
   no key (Zen needs none).
+- Title model ([title-model](adr/title-model.md)): with one set, `agent.title =
+  {model: "<provider>/<model>"}` (no `variant`: opencode applies none to title
+  requests). Same key rule as subagents. Without it, opencode picks the chat
+  provider's small model if it has one, else the chat's model.
 - Git ([git-repos](adr/git-repos.md)): while a bucket is connected,
   `POORDSH_EXTRA_TOOLS` includes `repo` and the instructions file says what it
   is for. The app's plugin builds the tool with the zod that tensorlake-opencode

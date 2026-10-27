@@ -62,6 +62,11 @@ class Settings(context: Context) {
         get() = prefs.getString("subagent_effort", null)
         set(v) { prefs.edit().putString("subagent_effort", v).apply() }
 
+    /** "<engine>:<provider>/<model>" chat titles are written with; null = left to opencode (docs/adr/title-model.md). */
+    var titleModel: String?
+        get() = prefs.getString("title_model", null)
+        set(v) { prefs.edit().putString("title_model", v).apply() }
+
     /** Install newer opencode releases when the app finds them at launch. */
     var autoUpdateEngines: Boolean
         get() = prefs.getBoolean("auto_update_engines", false)
@@ -100,5 +105,6 @@ class Settings(context: Context) {
         "systemPrompt" to systemPrompt,
         "subagentModel" to subagentModel,
         "subagentEffort" to subagentEffort,
+        "titleModel" to titleModel,
     )
 }

@@ -461,6 +461,11 @@ class WebBridge(
                 graph.settings.subagentModel = model
                 graph.settings.subagentEffort = effort
             }
+            if (p.has("titleModel")) {
+                val model = p.str("titleModel")
+                engineSettings = engineSettings || model != graph.settings.titleModel
+                graph.settings.titleModel = model
+            }
             if (p.has("systemPrompt")) {
                 val next = p.optString("systemPrompt").trim()
                 if (next.length > SystemPrompt.MAX_CHARS) throw IllegalArgumentException("system_prompt_too_long")

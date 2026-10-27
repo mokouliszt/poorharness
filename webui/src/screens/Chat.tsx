@@ -163,6 +163,7 @@ export function Chat({ sessionId }: { sessionId: string }) {
       <ModelSheet />
       <OptionsSheet />
       <ModelSheet target="subagent" />
+      <ModelSheet target="title" />
       <ApprovalSheet sessionId={sessionId} />
       <QuestionSheet sessionId={sessionId} />
 

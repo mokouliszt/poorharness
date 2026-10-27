@@ -251,6 +251,7 @@ export interface Settings {
   /** "<engine>:<provider>/<model>" subagents run on; null = the chat's model (docs/adr/subagent-model.md). */
   subagentModel?: string | null;
   subagentEffort?: string | null;
+  titleModel?: string | null;
 }
 
 export interface ToolUpdateInfo {

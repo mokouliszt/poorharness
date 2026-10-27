@@ -74,6 +74,7 @@ interface State {
   modelSheet: boolean;
   /** The picker for the subagents' model, opened from the options sheet. */
   subagentSheet: boolean;
+  titleSheet: boolean;
   /** The Tensorlake API key sheet, opened from wherever a chat needs the key. */
   keySheet: boolean;
   /** The engine options sheet. */
@@ -137,6 +138,7 @@ const initial: State = {
   updateProgress: {},
   modelSheet: false,
   subagentSheet: false,
+  titleSheet: false,
   keySheet: false,
   optionsSheet: false,
   providerKeySheet: null,
@@ -201,6 +203,10 @@ export function pop(): boolean {
   }
   if (s.subagentSheet) {
     setSubagentSheet(false);
+    return true;
+  }
+  if (s.titleSheet) {
+    setTitleSheet(false);
     return true;
   }
   if (s.keySheet) {
@@ -300,6 +306,16 @@ export function setOptionsSheet(open: boolean) {
 /** Opened from the options sheet, which comes back when this closes. */
 export function setSubagentSheet(open: boolean) {
   set({ subagentSheet: open, optionsSheet: !open });
+}
+
+/** Opened from the options sheet, which comes back when this closes. */
+export function setTitleSheet(open: boolean) {
+  set({ titleSheet: open, optionsSheet: !open });
+}
+
+/** The model chat titles are written with; null leaves it to the chat's model (docs/adr/title-model.md). */
+export async function chooseTitleModel(id: string | null) {
+  await updateSettings({ titleModel: id });
 }
 
 /** The model subagents run on; null keeps them on the chat's model (docs/adr/subagent-model.md). */

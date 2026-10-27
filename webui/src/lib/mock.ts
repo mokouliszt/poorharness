@@ -5,7 +5,7 @@
 // ?loading (opencode still reporting its models), ?nokey (no Tensorlake key: chats run on the device),
 // ?nim (an NVIDIA NIM key is set), ?orca (an OrcaRouter key is set), ?infron (an Infron key is set), ?venice (a Venice key is set), ?ratelimit (a sent message waits for a
 // provider's daily limit), ?full (picked files do not fit in the sandbox),
-// ?updated (opencode was updated in the app and a newer release is out), ?prompt (a system prompt is set),
+// ?updated (opencode was updated in the app and a newer release is out), ?prompt (a system prompt is set), ?titlemodel (a title model is picked),
 // ?nos3 (no bucket connected), ?ask (a sent message gets questions back first), ?en (English UI).
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -52,6 +52,7 @@ export function createMockHost(emit: Emit) {
     systemPrompt: flags.includes("prompt") ? "返答は日本語で、結論から短く書く。\nコードを変えたらテストも足す。" : "",
     subagentModel: flags.includes("submodel") ? "opencode:opencode/big-pickle" : null,
     subagentEffort: null,
+    titleModel: flags.includes("titlemodel") ? "opencode:opencode/big-pickle" : null,
   };
   const tensorlake = { keySet: !flags.includes("nokey") };
   const tinyfish = { keySet: false };

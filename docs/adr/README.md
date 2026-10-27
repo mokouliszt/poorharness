@@ -37,6 +37,7 @@ can be followed. Procedures that are not decisions are in
 - [One system prompt for every chat](system-prompt.md)
 - [Git repositories for agents, kept in the bucket](git-repos.md)
 - [One model for subagents, from any provider](subagent-model.md)
+- [One model for chat titles, from any provider](title-model.md)
 - [The agent can ask the user questions](questions.md)
 - [Web access from the chat's sandbox, with TinyFish for usage limits](web-in-sandbox.md)
 - [Tensorlake on the free plan by default](tensorlake-free-plan.md)

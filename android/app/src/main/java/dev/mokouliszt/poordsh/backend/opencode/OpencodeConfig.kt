@@ -91,6 +91,8 @@ object OpencodeConfig {
         git: Boolean = false,
         /** A model that cannot call tools is on offer: define the agent that runs it ([CHAT_AGENT]). */
         chatAgent: Boolean = false,
+        /** The model chat titles are written with; null leaves it to opencode (docs/adr/title-model.md). */
+        titleModel: ModelRef? = null,
     ) {
         val skillNames = (skills + fromPlugins.skillNames).distinct()
         val config = JSONObject()
@@ -109,8 +111,7 @@ object OpencodeConfig {
         config.put("instructions", JSONArray().put(INSTRUCTIONS_PATH))
         if (providers.isNotEmpty()) config.put("provider", JSONObject().apply { providers.forEach { (id, block) -> put(id, block) } })
         fromPlugins.mcp().takeIf { it.length() > 0 }?.let { config.put("mcp", it) }
-        val agent = if (EngineOptions.SUBAGENTS in options) agents(fromPlugins, subagentModel) else JSONObject()
-        if (chatAgent) agent.put(CHAT_AGENT, chatAgent())
+        val agent = agentBlock(options, fromPlugins, subagentModel, chatAgent, titleModel)
         if (agent.length() > 0) config.put("agent", agent)
         val experimental = JSONObject()
         if (EngineOptions.BATCH_TOOL in options) experimental.put("batch_tool", true)
@@ -123,6 +124,20 @@ object OpencodeConfig {
         file.writeText(config.toString(2))
     }
 
+    /** The `agent` block: subagents (when on), the plain-chat agent, the title agent's model. */
+    fun agentBlock(
+        options: Set<String>,
+        fromPlugins: OpencodePlugins,
+        subagentModel: ModelRef?,
+        chatAgent: Boolean,
+        titleModel: ModelRef?,
+    ): JSONObject {
+        val agent = if (EngineOptions.SUBAGENTS in options) agents(fromPlugins, subagentModel) else JSONObject()
+        if (chatAgent) agent.put(CHAT_AGENT, chatAgent())
+        titleModel?.let { agent.put(TITLE_AGENT, titleAgent(it)) }
+        return agent
+    }
+
     /** opencode's own subagents; their prompts and tools stay as opencode defines them. */
     val BUILT_IN_SUBAGENTS = listOf("general", "explore")
 
@@ -133,6 +148,15 @@ object OpencodeConfig {
      * them gives a plain chat (docs/adr/venice.md).
      */
     const val CHAT_AGENT = "chat"
+
+    /**
+     * opencode's hidden agent that names a chat after its first message. Only its model is
+     * set: its prompt stays opencode's, and opencode sends it no tools and no reasoning
+     * level (a title request uses the model's lightest settings), so a level is not kept.
+     */
+    const val TITLE_AGENT = "title"
+
+    fun titleAgent(model: ModelRef): JSONObject = JSONObject().put("model", model.model)
 
     fun chatAgent(): JSONObject = JSONObject()
         .put("mode", "primary")

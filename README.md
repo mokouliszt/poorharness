@@ -81,7 +81,8 @@ start. Optional:
 - The sliders button in the header opens opencode's switches: subagents (on
   unless you turn them off) and features that are off by default, such as the
   batch tool. Under subagents you pick the model they run on, from any
-  provider; by default they use the chat's model.
+  provider; by default they use the chat's model. The same sheet sets the
+  chat title model (by default, the chat's model).
 - The paperclip attaches files of any type; the only size limit is the free
   space in the chat's sandbox, checked when you pick a file. Files go into
   `/tmp/workspace/attachments`. Images, and PDFs for opencode models that
@@ -184,7 +185,7 @@ cd webui && npm install && npm run dev
 A mock host stands in for the app (`?setup` shows first run, `?nokey` without
 a Tensorlake key, `?nim` with an NVIDIA NIM key, `?orca` with an OrcaRouter
 key, `?infron` with an Infron key, `?venice` with a Venice key, `?nos3` without a bucket, `?prompt` with a
-system prompt, `?submodel` with a model for subagents, `?ask` with questions
+system prompt, `?submodel` with a model for subagents, `?titlemodel` with a model for chat titles, `?ask` with questions
 from the agent after a message, `?ratelimit` with a
 message waiting for a daily limit, `?full` with attached files that do not
 fit).

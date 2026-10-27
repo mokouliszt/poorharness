@@ -99,6 +99,7 @@ export function Home() {
       <ModelSheet />
       <OptionsSheet />
       <ModelSheet target="subagent" />
+      <ModelSheet target="title" />
 
       <Sheet open={!!pendingDelete} onClose={() => setPendingDelete(null)} title={t("chat.deleteConfirm")}>
         <div className="grid gap-2 px-5 pb-2">

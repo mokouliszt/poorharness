@@ -195,6 +195,7 @@ class OpencodeBackend(
                 subagentModel(), git,
                 // After providerBlocks(), which learns which offered models cannot call tools.
                 chatAgent = chatOnly.isNotEmpty(),
+                titleModel = usable(settings.titleModel, "title model", "titles use the chat's model"),
             )
         }
         writeConfig?.invoke()
@@ -296,16 +297,20 @@ class OpencodeBackend(
      * models.dev's stays.
      */
     /**
-     * The model picked for subagents, when its provider can run here: Zen's free
-     * models need no key, any other provider needs its key. Otherwise subagents
-     * stay on the turn's model rather than fail.
+     * The model picked for subagents (or, below, for titles), when its provider can
+     * run here: Zen's free models need no key, any other provider needs its key.
+     * Otherwise they stay on the turn's model rather than fail.
      */
-    private fun subagentModel(): ModelRef? {
-        val id = settings.subagentModel ?: return null
-        val ref = ModelRef.parse(id, settings.subagentEffort)
+    private fun subagentModel(): ModelRef? =
+        usable(settings.subagentModel, "subagent model", "subagents use the turn's model", settings.subagentEffort)
+
+    /** A model picked in a setting ([what]), or null when its provider cannot run here ([otherwise] is logged). */
+    private fun usable(id: String?, what: String, otherwise: String, effort: String? = null): ModelRef? {
+        id ?: return null
+        val ref = ModelRef.parse(id, effort)
         if (ref.backend != ID || ref.provider.isEmpty()) return null
         if (ref.provider != "opencode" && ref.provider !in OpencodeConfig.storedCredentials(paths)) {
-            Logs.opencode.add("subagent model ${ref.model}: no key for ${ref.provider}; subagents use the turn's model")
+            Logs.opencode.add("$what ${ref.model}: no key for ${ref.provider}; $otherwise")
             return null
         }
         return ref

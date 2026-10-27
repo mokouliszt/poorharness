@@ -1,6 +1,7 @@
 package dev.mokouliszt.poordsh.backend.opencode
 
 import dev.mokouliszt.poordsh.backend.EngineOptions
+import dev.mokouliszt.poordsh.backend.ModelRef
 import dev.mokouliszt.poordsh.settings.Settings.Approval
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -66,6 +67,23 @@ class OpencodeConfigTest {
         // opencode sends only the tools its permissions allow; a model that rejects tools needs none.
         assertEquals("deny", agent.getJSONObject("permission").getString("*"))
         assertEquals("primary", agent.getString("mode"))
+    }
+
+    @Test
+    fun titlesUseThePickedModelOnly() {
+        val none = OpencodeConfig.agentBlock(emptySet(), OpencodePlugins(emptyList()), null, false, null)
+        // Not picked: no title agent, so opencode chooses as it always has.
+        assertFalse(none.has(OpencodeConfig.TITLE_AGENT))
+        val picked = OpencodeConfig.agentBlock(
+            emptySet(), OpencodePlugins(emptyList()), null, false,
+            ModelRef.parse("opencode:infron/deepseek/deepseek-v4-flash:free", "high"),
+        )
+        val title = picked.getJSONObject(OpencodeConfig.TITLE_AGENT)
+        assertEquals("infron/deepseek/deepseek-v4-flash:free", title.getString("model"))
+        // Only the model: opencode keeps the agent's prompt, and ignores a level for titles.
+        assertEquals(setOf("model"), title.keys().asSequence().toSet())
+        // Independent of the subagents switch.
+        assertFalse(picked.has("general"))
     }
 
     @Test
