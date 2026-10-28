@@ -1,6 +1,6 @@
 # Skills live in one place, read where they are used
 
-Status: accepted (2026-10, 0.4.0; sync shared with plugins in 0.8.0; opencode only in 0.11.0)
+Status: accepted (2026-10, 0.4.0; sync shared with plugins in 0.8.0; opencode only in 0.11.0; other agents' frontmatter keys kept in 0.16.1)
 
 ## Context
 
@@ -17,10 +17,17 @@ Tensorlake (`/home/tl-user`) and a device jail (`/root`).
   adds a skill from a picked `.skill` or `.zip` and removes one. An archive is
   accepted when skill-creator's checks pass (`SkillPackage`, after
   `scripts/quick_validate.py` and `package_skill.py`): one `SKILL.md` with
-  frontmatter keys from its list, a kebab-case `name` of at most 64
+  a kebab-case `name` of at most 64
   characters (also the folder name), a `description` without angle brackets
   of at most 1024; caches, `node_modules` and a top-level `evals/` are dropped
   as the packager drops them. Unsafe paths and oversized archives are refused.
+  Unlike quick_validate.py, frontmatter keys outside its list are kept rather
+  than refused: skills made for other agents carry their own (Claude Code's
+  `user-invocable`, `disable-model-invocation`, `argument-hint`, …), opencode
+  ignores keys it does not know (checked with 1.19.0: a skill with
+  `user-invocable` is listed by `GET /skill`), and a list of every agent's keys
+  would need constant upkeep. Agent-specific features such as Claude Code's `` !`command` ``
+  context lines reach opencode as plain text.
 - One path, [`SkillSync.ROOT`](../../android/app/src/main/java/dev/mokouliszt/poordsh/skills/SkillSync.kt)
   = `/tmp/poordsh/skills`, means the same everywhere:
   - opencode's PRoot binds the store there, and its config lists that path

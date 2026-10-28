@@ -90,8 +90,8 @@ start. Optional:
 - Settings → System prompt holds instructions every chat gets. A change
   applies from each chat's next message.
 - Settings → Skills adds Agent Skills from a `.skill` or `.zip` made with
-  Anthropic's skill-creator; a copy is synced into each chat's sandbox before
-  every message.
+  Anthropic's skill-creator or for Claude Code; a copy is synced into each
+  chat's sandbox before every message.
 - Settings → Plugins adds a plugin from a `.zip` or `.plugin` archive (Agent
   Plugins, Codex, Claude or Cursor format). opencode uses its skills, its MCP
   servers reached by URL and its agents; tap a plugin to see what is used.

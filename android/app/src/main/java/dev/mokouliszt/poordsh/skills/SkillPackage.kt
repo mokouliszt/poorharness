@@ -10,7 +10,11 @@ import java.io.InputStream
 /**
  * Reads an Agent Skill packed as a `.skill` or `.zip` file and checks it the way
  * Anthropic's skill-creator does (scripts/quick_validate.py and package_skill.py),
- * so anything that tool packages is accepted.
+ * so anything that tool packages is accepted. One check is left out: frontmatter
+ * keys skill-creator does not list are kept, not refused. Agents add their own
+ * (Claude Code's `user-invocable`, `disable-model-invocation`, `argument-hint`, …)
+ * and opencode reads only what it knows, so refusing them would turn away working
+ * skills, and keeping a list of every agent's keys would be endless upkeep.
  *
  * Accepted layouts: the skill folder at the top of the archive (what
  * package_skill writes: `<folder>/SKILL.md`), or SKILL.md at the top itself.
@@ -23,9 +27,6 @@ object SkillPackage {
     data class Parsed(val name: String, val description: String, val root: File)
 
     data class Frontmatter(val name: String, val description: String)
-
-    /** The keys skill-creator accepts in SKILL.md frontmatter. */
-    val ALLOWED_KEYS = setOf("name", "description", "license", "allowed-tools", "metadata", "compatibility")
 
     private const val MAX_NAME = 64
     private const val MAX_DESCRIPTION = 1024
@@ -56,7 +57,7 @@ object SkillPackage {
         return Parsed(fm.name, fm.description, root)
     }
 
-    /** quick_validate.py's frontmatter checks, plus a name being required (it names the install). */
+    /** quick_validate.py's frontmatter checks but the key list, plus a name being required (it names the install). */
     fun validate(skillMd: String): Frontmatter {
         val content = skillMd.replace("\r\n", "\n").removePrefix("﻿")
         if (!content.startsWith("---")) throw Invalid("no_frontmatter", "No YAML frontmatter found in SKILL.md.")
@@ -68,14 +69,6 @@ object SkillPackage {
             throw Invalid("bad_yaml", "Invalid YAML in frontmatter: ${e.message?.lineSequence()?.firstOrNull()}")
         }
         val map = yaml as? Map<*, *> ?: throw Invalid("bad_yaml", "Frontmatter must be a YAML dictionary.")
-        val unexpected = map.keys.map { it.toString() }.filter { it !in ALLOWED_KEYS }.sorted()
-        if (unexpected.isNotEmpty()) {
-            throw Invalid(
-                "unexpected_keys",
-                "Unexpected key(s) in SKILL.md frontmatter: ${unexpected.joinToString(", ")}. " +
-                    "Allowed properties are: ${ALLOWED_KEYS.sorted().joinToString(", ")}",
-            )
-        }
         if ("name" !in map) throw Invalid("no_name", "Missing 'name' in frontmatter.")
         if ("description" !in map) throw Invalid("no_description", "Missing 'description' in frontmatter.")
         val rawName = map["name"] as? String ?: throw Invalid("bad_name", "Name must be a string.")

@@ -89,10 +89,22 @@ class SkillPackageTest {
     }
 
     @Test
+    fun keysOtherAgentsAddAreKept() {
+        // Claude Code's own keys, as in a skill made for it (quick_validate.py would refuse them).
+        val md = md(
+            "name: ui-kit\ndescription: Builds UI.\nuser-invocable: false\ndisable-model-invocation: false\n" +
+                "argument-hint: \"[component]\"\nallowed-tools: Bash(npx ui-kit *)\nversion: 2",
+        )
+        val parsed = extract(zip("ui-kit/SKILL.md" to md))
+        assertEquals("ui-kit", parsed.name)
+        // The file is kept as it was: opencode reads the keys it knows.
+        assertEquals(md, File(parsed.root, "SKILL.md").readText())
+    }
+
+    @Test
     fun refusesWhatQuickValidateRefuses() {
         assertEquals("no_frontmatter", reason(zip("s/SKILL.md" to "# no frontmatter")))
         assertEquals("bad_frontmatter", reason(zip("s/SKILL.md" to "---\nname: x\n")))
-        assertEquals("unexpected_keys", reason(zip("s/SKILL.md" to md("name: s\ndescription: d\nversion: 2"))))
         assertEquals("no_name", reason(zip("s/SKILL.md" to md("description: d"))))
         assertEquals("no_description", reason(zip("s/SKILL.md" to md("name: s"))))
         assertEquals("bad_description", reason(zip("s/SKILL.md" to md("name: s\ndescription:"))))

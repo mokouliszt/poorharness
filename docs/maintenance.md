@@ -84,8 +84,9 @@ reasons behind them are in [`docs/adr/`](adr/README.md).
 
 `SkillPackage` mirrors the checks in Anthropic's skill-creator
 (`scripts/quick_validate.py`) and what its packager leaves out
-(`scripts/package_skill.py`). When skill-creator changes either (new frontmatter
-keys, different limits), update `SkillPackage` and `SkillPackageTest`, and
+(`scripts/package_skill.py`), except its list of frontmatter keys, which is not
+enforced ([skills](adr/skills.md)). When skill-creator changes its other checks
+(different limits, new required fields), update `SkillPackage` and `SkillPackageTest`, and
 re-package `android/app/src/test/resources/skills/csv-tidy.skill` with the new
 packager.
 
