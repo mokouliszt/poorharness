@@ -1,6 +1,6 @@
 # Skills live in one place, read where they are used
 
-Status: accepted (2026-10, 0.4.0; sync shared with plugins in 0.8.0; opencode only in 0.11.0; other agents' frontmatter keys kept in 0.16.1)
+Status: accepted (2026-10, 0.4.0; sync shared with plugins in 0.8.0; opencode only in 0.11.0; other agents' frontmatter keys kept in 0.16.1; files shown in 0.17.0)
 
 ## Context
 
@@ -14,7 +14,12 @@ Tensorlake (`/home/tl-user`) and a device jail (`/root`).
 ## Decision
 
 - The store is `files/skills/<name>/` on the phone (`SkillStore`). Settings
-  adds a skill from a picked `.skill` or `.zip` and removes one. An archive is
+  adds a skill from a picked `.skill` or `.zip`, and a skill opens to its
+  files as installed, to check that nothing was lost in the archive: a
+  folder tree, and a read-only view of each file (text up to 256 KB with line
+  numbers, Markdown also rendered, images up to 2 MB; other files by size).
+  A newly added skill opens there, and that is also where it is deleted. Only
+  paths inside the skill's folder are read. An archive is
   accepted when skill-creator's checks pass (`SkillPackage`, after
   `scripts/quick_validate.py` and `package_skill.py`): one `SKILL.md` with
   a kebab-case `name` of at most 64

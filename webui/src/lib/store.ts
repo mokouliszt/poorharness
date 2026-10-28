@@ -33,7 +33,10 @@ export type Screen =
   | { name: "diagnostics" }
   | { name: "licenses" }
   | { name: "outputs"; shelf: Shelf }
-  | { name: "repos" };
+  | { name: "repos" }
+  /** An installed skill's files (docs/adr/skills.md); [path] relative to the skill's folder. */
+  | { name: "skill"; skill: string }
+  | { name: "skillFile"; skill: string; path: string };
 
 export interface Toast {
   id: number;

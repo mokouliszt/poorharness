@@ -168,6 +168,20 @@ export interface SkillInfo {
   bytes: number;
 }
 
+/** An installed skill's files (`skills.files`), paths relative to its folder. */
+export interface SkillFiles {
+  name: string;
+  description: string | null;
+  files: { path: string; size: number }[];
+  bytes: number;
+}
+
+/** One file of a skill (`skills.read`): text (cut past 256 KB), an image, or neither. */
+export type SkillContent =
+  | { kind: "text"; size: number; text: string; truncated: boolean }
+  | { kind: "image"; size: number; mime: string; data: string }
+  | { kind: "binary"; size: number };
+
 /** An installed plugin (`plugins.list`): what it holds, read from its manifest. */
 export interface PluginInfo {
   name: string;

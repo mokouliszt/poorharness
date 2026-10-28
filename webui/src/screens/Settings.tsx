@@ -7,7 +7,6 @@ import {
   applyUpdate,
   checkUpdates,
   deletePlugin,
-  deleteSkill,
   loadPlugins,
   loadSkills,
   hasProviderKey,
@@ -32,7 +31,9 @@ import {
 } from "@/lib/store";
 import { describeError, useT } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
-import type { Approval, Engine, PluginInfo, SkillInfo } from "@/lib/types";
+import { fileSize } from "@/lib/format";
+import { count } from "@/screens/Skill";
+import type { Approval, Engine, PluginInfo } from "@/lib/types";
 import { TopBar } from "@/components/TopBar";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
@@ -235,22 +236,27 @@ function SystemPromptRow() {
 /** Matches SystemPrompt.MAX_CHARS on the host. */
 const SYSTEM_PROMPT_MAX = 20_000;
 
-/** Skills the user added (.skill or .zip, as skill-creator packs them); every chat's sandbox gets them. */
+/**
+ * Skills the user added (.skill or .zip, as skill-creator packs them); every chat's
+ * sandbox gets them. Each opens to its files, where it is also deleted.
+ */
 function Skills() {
   const t = useT();
   const skills = useStore((s) => s.skills);
   const [adding, setAdding] = useState(false);
-  const [removing, setRemoving] = useState<SkillInfo | null>(null);
   useEffect(() => {
     void loadSkills().catch(() => undefined);
   }, []);
-  useEffect(() => (removing ? onBackClose(() => setRemoving(null)) : undefined), [removing]);
 
   async function add() {
     setAdding(true);
     try {
       const name = await addSkill();
-      if (name) toast(t("skills.added", { name }));
+      if (name) {
+        toast(t("skills.added", { name }));
+        // Straight to what went in.
+        push({ name: "skill", skill: name });
+      }
     } catch (e) {
       const message = (e as Error).message;
       toast(
@@ -267,18 +273,17 @@ function Skills() {
   return (
     <>
       {(skills ?? []).map((sk) => (
-        <Row key={sk.name}>
+        <Row key={sk.name} onClick={() => push({ name: "skill", skill: sk.name })}>
           <div className="min-w-0 flex-1">
-            <div className="truncate font-mono text-sm">{sk.name}</div>
+            <div className="flex items-baseline gap-2">
+              <span className="truncate font-mono text-sm">{sk.name}</span>
+              <span className="shrink-0 font-mono text-xs text-mute">
+                {count(t, "files", sk.files)} · {fileSize(sk.bytes)}
+              </span>
+            </div>
             {sk.description && <div className="phrase line-clamp-2 text-xs text-mute">{sk.description}</div>}
           </div>
-          <button
-            onClick={() => setRemoving(sk)}
-            aria-label={t("skills.remove", { name: sk.name })}
-            className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-mute active:bg-surface"
-          >
-            <Trash2 size={17} />
-          </button>
+          <ChevronRight size={16} className="shrink-0 text-mute" />
         </Row>
       ))}
       <Row disabled={adding} onClick={() => void add()}>
@@ -286,24 +291,6 @@ function Skills() {
         <span className="flex-1">{adding ? t("skills.adding") : t("skills.add")}</span>
         <span className="font-mono text-xs text-mute">{t("skills.formats")}</span>
       </Row>
-      <Sheet open={!!removing} onClose={() => setRemoving(null)} title={t("skills.removeTitle", { name: removing?.name ?? "" })}>
-        <div className="space-y-3 px-5 pb-2">
-          <Button
-            variant="danger"
-            className="w-full"
-            onClick={() => {
-              const name = removing?.name;
-              setRemoving(null);
-              if (name) void deleteSkill(name).catch((e: Error) => toast(describeError(t, e.message), "error"));
-            }}
-          >
-            {t("common.delete")}
-          </Button>
-          <Button variant="ghost" className="w-full" onClick={() => setRemoving(null)}>
-            {t("common.cancel")}
-          </Button>
-        </div>
-      </Sheet>
     </>
   );
 }

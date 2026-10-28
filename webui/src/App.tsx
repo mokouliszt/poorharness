@@ -11,6 +11,7 @@ import { Diagnostics } from "@/screens/Diagnostics";
 import { Licenses } from "@/screens/Licenses";
 import { Outputs } from "@/screens/Outputs";
 import { Repos } from "@/screens/Repos";
+import { Skill, SkillFile } from "@/screens/Skill";
 import { Toasts } from "@/components/Toasts";
 import { ApprovalSheet } from "@/components/ApprovalSheet";
 import { QuestionSheet } from "@/components/QuestionSheet";
@@ -45,6 +46,8 @@ export function App() {
   else if (screen.name === "licenses") body = <Licenses />;
   else if (screen.name === "outputs") body = <Outputs key={screen.shelf} shelf={screen.shelf} />;
   else if (screen.name === "repos") body = <Repos />;
+  else if (screen.name === "skill") body = <Skill key={screen.skill} name={screen.skill} />;
+  else if (screen.name === "skillFile") body = <SkillFile key={`${screen.skill}/${screen.path}`} skill={screen.skill} path={screen.path} />;
   else body = <Home />;
 
   return (

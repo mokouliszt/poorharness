@@ -28,6 +28,7 @@ import dev.mokouliszt.poordsh.runtime.Tools
 import dev.mokouliszt.poordsh.secrets.SecretStore
 import dev.mokouliszt.poordsh.settings.Settings
 import dev.mokouliszt.poordsh.skills.SkillPackage
+import dev.mokouliszt.poordsh.skills.SkillStore
 import dev.mokouliszt.poordsh.storage.S3Storage
 import dev.mokouliszt.poordsh.tensorlake.SandboxManager
 import dev.mokouliszt.poordsh.tensorlake.SandboxManager.Companion.WORKSPACE
@@ -166,6 +167,29 @@ class WebBridge(
             jsonOf("name" to info.name, "description" to info.description, "files" to info.files, "bytes" to info.bytes)
         }
         "skills.delete" -> { graph.skills.delete(p.getString("name")); null }
+        "skills.files" -> {
+            val name = p.getString("name")
+            val files = graph.skills.files(name) ?: throw IOException("skill_missing")
+            val info = graph.skills.list().firstOrNull { it.name == name }
+            jsonOf(
+                "name" to name,
+                "description" to info?.description,
+                "files" to JSONArray().apply { files.forEach { put(jsonOf("path" to it.path, "size" to it.size)) } },
+                "bytes" to files.sumOf { it.size },
+            )
+        }
+        "skills.read" -> {
+            val content = try {
+                graph.skills.read(p.getString("name"), p.getString("path"))
+            } catch (_: IllegalArgumentException) {
+                throw IOException("skill_missing")
+            }
+            when (content) {
+                is SkillStore.Content.Text -> jsonOf("kind" to "text", "size" to content.size, "text" to content.text, "truncated" to content.truncated)
+                is SkillStore.Content.Image -> jsonOf("kind" to "image", "size" to content.size, "mime" to content.mime, "data" to content.base64)
+                is SkillStore.Content.Binary -> jsonOf("kind" to "binary", "size" to content.size)
+            }
+        }
 
         // --- plugins (Settings) ---
         "plugins.list" -> JSONArray().apply { graph.plugins.list().forEach { put(pluginJson(it)) } }

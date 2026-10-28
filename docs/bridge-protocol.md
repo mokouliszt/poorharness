@@ -105,6 +105,8 @@ JSON with `chatId`, except `/repo` and `/web`.
 | `skills.list` | – | `[{name, description, files, bytes}]` |
 | `skills.add` | – | `{name, description, files, bytes}` or `null` (picker closed); an archive skill-creator would not accept fails with `skill_invalid: <reason>` ([skills](adr/skills.md)) |
 | `skills.delete` | `{name}` | – |
+| `skills.files` | `{name}` | `{name, description, files[{path, size}], bytes}` — every file, `path` relative to the skill's folder with `/`, sorted; `skill_missing` when not installed |
+| `skills.read` | `{name, path}` | `{kind: "text", size, text, truncated}` (UTF-8, cut at 256 KB), `{kind: "image", size, mime, data}` (base64; PNG, JPEG, GIF, WebP up to 2 MB) or `{kind: "binary", size}`; `skill_missing` for a path outside the skill or not a file |
 | `plugins.list` | – | `PluginInfo[]`: `{name, version, description, format, files, bytes, skills[{name, description}], mcpServers[{name, remote, url, command}], hooks[{event, command}], agents[{name, description}], commands, apps}`; `format` is `agent-plugins`, `codex`, `claude` or `cursor` ([plugins](adr/plugins.md)) |
 | `plugins.add` | – | `PluginInfo` or `null` (picker closed); an archive that is not one plugin fails with `plugin_invalid:<reason>: <message>` |
 | `plugins.delete` | `{name}` | – |
@@ -205,6 +207,7 @@ codes (or contain one); the UI words them (`describeError` in
 | `tensorlake_plugin_unavailable` | opencode started without its sandbox tools (see below); it is stopped again |
 | `attach_no_space` | attached files do not fit on the phone or in the chat's sandbox |
 | `attachment_missing` | a file named in `chat.send` is no longer held (the app restarted) |
+| `skill_missing` | `skills.files` / `skills.read`: the skill, or the file, is not installed |
 | `skill_invalid: …` | `skills.add`: the archive is not a skill skill-creator would accept; the rest says why |
 | `s3_denied`, `s3_no_bucket`, `s3_unreachable`, `s3_bad_endpoint`, `s3_secret_missing`, `s3_not_connected` | the bucket in Settings |
 | `output_missing`, `output_no_space`, `output_failed` | a handed-over file: no longer kept; did not fit on the phone; could not be fetched |

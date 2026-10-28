@@ -198,9 +198,25 @@ export function createMockHost(emit: Emit) {
   // Files picked in the composer, until they are sent.
   const picked: Record<string, any> = {};
   let pickSeq = 1;
-  const skills: any[] = [
-    { name: "csv-tidy", description: "Cleans up CSV files and reports rows with the wrong number of columns.", files: 3, bytes: 826 },
-  ];
+  // What each skill holds, for its files screen; `skills.list` counts from here.
+  const skillFiles: Record<string, Record<string, string>> = {
+    "csv-tidy": {
+      "SKILL.md": "---\nname: csv-tidy\ndescription: Cleans up CSV files and reports rows with the wrong number of columns.\n---\n\n# CSV tidy\n\nRun `scripts/tidy.py <file>` and report what it fixed.\n\n- Trims spaces around fields\n- Flags rows with the wrong column count\n\nSee [dialects](references/dialects.md) for separators.\n",
+      "scripts/tidy.py": "import csv\nimport sys\n\n\ndef main(path: str) -> None:\n    with open(path, newline=\"\") as f:\n        rows = list(csv.reader(f))\n    width = len(rows[0])\n    for i, row in enumerate(rows, 1):\n        if len(row) != width:\n            print(f\"row {i}: {len(row)} columns, expected {width}\")\n\n\nif __name__ == \"__main__\":\n    main(sys.argv[1])\n",
+      "references/dialects.md": "# Dialects\n\n| Separator | Where |\n| --- | --- |\n| `,` | most exports |\n| `;` | spreadsheets set to a comma decimal |\n| `\\t` | TSV |\n",
+      "assets/icon.png": "",
+    },
+  };
+  const skillMeta: Record<string, string> = {
+    "csv-tidy": "Cleans up CSV files and reports rows with the wrong number of columns.",
+  };
+  const PNG = "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAKUlEQVR4nGNgGDTg9evX/0nBtDOAWJfS3gBcTh5JBuACtDdg4FLigAEAY6VoEJaQGfoAAAAASUVORK5CYII=";
+  const sizeOf = (path: string, text: string) => (path.endsWith(".png") ? 128 : new TextEncoder().encode(text).length);
+  const skillInfo = (name: string) => {
+    const files = Object.entries(skillFiles[name] ?? {});
+    return { name, description: skillMeta[name] ?? "", files: files.length, bytes: files.reduce((n, [p, t]) => n + sizeOf(p, t), 0) };
+  };
+  const skills: any[] = [skillInfo("csv-tidy")];
   const storage: any = {
     destination: "device",
     s3: flags.includes("nos3") ? null : { endpoint: "https://s3.us-east-1.amazonaws.com", bucket: "my-bucket", accessKeyId: "AKIAIOSFODNN7EXAMPLE", region: "", prefix: "" },
@@ -424,9 +440,33 @@ export function createMockHost(emit: Emit) {
         return skills.map((x) => ({ ...x }));
       case "skills.add": {
         await sleep(400);
-        const sk = { name: "pdf-forms", description: "Fills in PDF forms from a table of values and checks every field was set.", files: 5, bytes: 41_984 };
+        skillMeta["pdf-forms"] = "Fills in PDF forms from a table of values and checks every field was set.";
+        skillFiles["pdf-forms"] = {
+          "SKILL.md": "---\nname: pdf-forms\ndescription: Fills in PDF forms from a table of values and checks every field was set.\n---\n\n# PDF forms\n\n1. List the fields with `scripts/fields.py`.\n2. Fill them with `scripts/fill.py`.\n",
+          "scripts/fields.py": "from pypdf import PdfReader\nimport sys\n\nfor name in PdfReader(sys.argv[1]).get_fields() or {}:\n    print(name)\n",
+          "scripts/fill.py": "from pypdf import PdfReader, PdfWriter\n",
+          "reference/field-types.md": "# Field types\n\nText, checkbox, radio, choice.\n",
+          "assets/fonts/NotoSans.ttf": "\u0000",
+        };
+        const sk = skillInfo("pdf-forms");
         if (!skills.some((x) => x.name === sk.name)) skills.push(sk);
         return sk;
+      }
+      case "skills.files": {
+        await sleep(150);
+        const files = skillFiles[p.name];
+        if (!files) throw new Error("skill_missing");
+        const list = Object.entries(files).map(([path, text]) => ({ path, size: sizeOf(path, text) })).sort((a, b) => a.path.localeCompare(b.path));
+        return { name: p.name, description: skillMeta[p.name] ?? null, files: list, bytes: list.reduce((n, f) => n + f.size, 0) };
+      }
+      case "skills.read": {
+        await sleep(120);
+        const text = skillFiles[p.name]?.[p.path];
+        if (text === undefined) throw new Error("skill_missing");
+        const size = sizeOf(p.path, text);
+        if (p.path.endsWith(".png")) return { kind: "image", size, mime: "image/png", data: PNG };
+        if (text.includes("\u0000")) return { kind: "binary", size: 48_210 };
+        return { kind: "text", size, text, truncated: false };
       }
       case "skills.delete": {
         const i = skills.findIndex((x) => x.name === p.name);
