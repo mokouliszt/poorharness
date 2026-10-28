@@ -1,6 +1,6 @@
 # Plugins: opencode gets the parts it has
 
-Status: accepted (2026-10, 0.8.0; revised in 0.11.0, opencode only)
+Status: accepted (2026-10, 0.8.0; revised in 0.11.0, opencode only; files shown in 0.18.0)
 
 ## Context
 
@@ -56,6 +56,10 @@ system, with a marketplace file and per-hook trust; that went with Codex
   Adding or removing a plugin restarts opencode when it is next idle.
 - Hooks, commands and apps are not used. Settings shows, for each part of a
   plugin, whether it is.
+- A plugin opens to that summary and to its files as installed, the same
+  tree and read-only viewer as a skill's ([skills](skills.md)); each of its
+  skills opens on its `SKILL.md`. A newly added plugin opens there, and that
+  is also where it is deleted.
 
 ## Consequences
 
@@ -64,5 +68,8 @@ system, with a marketplace file and per-hook trust; that went with Codex
   offered in the app.
 - A plugin skill keeps its own name, so one named like another skill can hide it.
 - Verified with opencode 1.19.0 with tensorlake-opencode 0.3.1 (a plugin skill
-  with a reference file, a remote MCP tool, a plugin subagent). Updating
+  with a reference file, a remote MCP tool, a plugin subagent). A manifest
+  that lists each skill's own folder at any depth (Google's `android-skills`
+  1.0.18: 36 skills, 455 files) installs, and opencode lists all 36 from those
+  folders in `skills.paths`. Updating
   opencode means re-checking these ([`docs/maintenance.md`](../maintenance.md)).

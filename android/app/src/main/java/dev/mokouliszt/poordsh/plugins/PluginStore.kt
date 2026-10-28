@@ -1,6 +1,7 @@
 package dev.mokouliszt.poordsh.plugins
 
 import dev.mokouliszt.poordsh.skills.FolderSync
+import dev.mokouliszt.poordsh.skills.InstalledFiles
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -63,6 +64,18 @@ class PluginStore(val dir: File) {
             target.deleteRecursively()
             changed()
         }
+    }
+
+    /** Every file of plugin [name], by path; null when it is not installed. */
+    fun files(name: String): List<InstalledFiles.Entry>? = installedDir(name)?.let(InstalledFiles::list)
+
+    /** The file at [rel] in plugin [name], read-only ([InstalledFiles.read]). */
+    fun read(name: String, rel: String): InstalledFiles.Content =
+        InstalledFiles.read(installedDir(name) ?: throw IllegalArgumentException("no such plugin"), rel)
+
+    private fun installedDir(name: String): File? {
+        val ok = Regex("^[a-z0-9][a-z0-9.-]*$").matches(name) && ".." !in name
+        return if (ok && state().plugins.any { it.manifest.name == name }) File(dir, name) else null
     }
 
     /** File of plugin [name] at [rel], as listed in its [FolderSync.Entry]. */

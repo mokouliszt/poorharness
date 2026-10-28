@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Check, ChevronRight, LoaderCircle, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronRight, LoaderCircle, Plus } from "lucide-react";
 import { call } from "@/lib/bridge";
 import {
   addPlugin,
   addSkill,
   applyUpdate,
   checkUpdates,
-  deletePlugin,
   loadPlugins,
   loadSkills,
   hasProviderKey,
@@ -19,7 +18,6 @@ import {
   setKeySheet,
   setTinyfishSheet,
   hasTinyfishKey,
-  setPluginSheet,
   onBackClose,
   loadStorage,
   setDestination,
@@ -32,8 +30,8 @@ import {
 import { describeError, useT } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import { fileSize } from "@/lib/format";
-import { count } from "@/screens/Skill";
-import type { Approval, Engine, PluginInfo } from "@/lib/types";
+import { count, partsSummary } from "@/screens/Installed";
+import type { Approval, Engine } from "@/lib/types";
 import { TopBar } from "@/components/TopBar";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
@@ -295,21 +293,17 @@ function Skills() {
   );
 }
 
-/** Plugin archives; each engine uses the parts it can (docs/adr/plugins.md). */
+/**
+ * Plugin archives; each engine uses the parts it can (docs/adr/plugins.md). Each
+ * opens to what it holds and its files, where it is also deleted.
+ */
 function Plugins() {
   const t = useT();
   const plugins = useStore((s) => s.plugins);
   const [adding, setAdding] = useState(false);
-  const shown = useStore((s) => s.pluginSheet);
   useEffect(() => {
     void loadPlugins().catch(() => undefined);
   }, []);
-  // Kept while the sheet slides away after a delete, so it does not empty first.
-  const [last, setLast] = useState<PluginInfo | null>(null);
-  const current = (plugins ?? []).find((x) => x.name === shown) ?? null;
-  useEffect(() => {
-    if (current) setLast(current);
-  }, [current]);
 
   async function add() {
     setAdding(true);
@@ -317,7 +311,8 @@ function Plugins() {
       const name = await addPlugin();
       if (name) {
         toast(t("plugins.added", { name }));
-        setPluginSheet(name);
+        // Straight to what went in.
+        push({ name: "plugin", plugin: name });
       }
     } catch (e) {
       toast(pluginError(t, (e as Error).message), "error");
@@ -329,11 +324,13 @@ function Plugins() {
   return (
     <>
       {(plugins ?? []).map((pl) => (
-        <Row key={pl.name} onClick={() => setPluginSheet(pl.name)}>
+        <Row key={pl.name} onClick={() => push({ name: "plugin", plugin: pl.name })}>
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
               <span className="truncate font-mono text-sm">{pl.name}</span>
-              {pl.version && <span className="shrink-0 font-mono text-xs text-mute">{pl.version}</span>}
+              <span className="shrink-0 font-mono text-xs text-mute">
+                {[pl.version, count(t, "files", pl.files), fileSize(pl.bytes)].filter(Boolean).join(" · ")}
+              </span>
             </div>
             <div className="truncate text-xs text-mute">{partsSummary(t, pl) || pl.description}</div>
           </div>
@@ -345,7 +342,6 @@ function Plugins() {
         <span className="flex-1">{adding ? t("plugins.adding") : t("plugins.add")}</span>
         <span className="font-mono text-xs text-mute">{t("plugins.formats")}</span>
       </Row>
-      <PluginSheet plugin={current ?? last} open={!!current} onClose={() => setPluginSheet(null)} />
     </>
   );
 }
@@ -359,113 +355,6 @@ function pluginError(t: ReturnType<typeof useT>, message: string): string {
     no_manifest: "plugins.noManifest",
   };
   return known[m[1]] ? t(known[m[1]]) : t("plugins.invalid", { message: m[2] });
-}
-
-function partsSummary(t: ReturnType<typeof useT>, p: PluginInfo): string {
-  const parts: [Parameters<typeof t>[0], number][] = [
-    ["plugins.skills", p.skills.length],
-    ["plugins.mcp", p.mcpServers.length],
-    ["plugins.agents", p.agents.length],
-    ["plugins.hooks", p.hooks.length],
-    ["plugins.apps", p.apps],
-    ["plugins.commands", p.commands],
-  ];
-  return parts.filter(([, n]) => n > 0).map(([k, n]) => `${t(k)} ${n}`).join(" · ");
-}
-
-/** Marks a part opencode does not use. */
-function Unused() {
-  const t = useT();
-  return <span className="shrink-0 text-xs text-mute">{t("plugins.unused")}</span>;
-}
-
-function Part({ title, unused, children }: { title: string; unused?: boolean; children?: ReactNode }) {
-  return (
-    <div className="py-2.5">
-      <div className="flex items-baseline gap-3">
-        <span className="flex-1 text-sm text-ink">{title}</span>
-        {unused && <Unused />}
-      </div>
-      {children && <div className="mt-1.5 space-y-1">{children}</div>}
-    </div>
-  );
-}
-
-function PluginSheet({ plugin, open, onClose }: { plugin: PluginInfo | null; open: boolean; onClose: () => void }) {
-  const t = useT();
-  const [confirming, setConfirming] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  useEffect(() => setConfirming(false), [plugin?.name, open]);
-  const p = plugin;
-  const names = (items: { name: string }[]) => (
-    <div className="phrase font-mono text-xs text-mute">{items.map((i) => i.name).join(", ")}</div>
-  );
-  return (
-    <Sheet open={open} onClose={onClose} title={p?.name ?? ""}>
-      {p && (
-        <div className="scroll-quiet min-h-0 overflow-y-auto px-5 pb-2">
-          {p.description && <p className="phrase pb-1 text-sm text-mute">{p.description}</p>}
-          <div className="divide-y divide-line">
-            {p.skills.length > 0 && (
-              <Part title={`${t("plugins.skills")} ${p.skills.length}`}>
-                {names(p.skills)}
-              </Part>
-            )}
-            {p.mcpServers.length > 0 && (
-              <Part title={`${t("plugins.mcp")} ${p.mcpServers.length}`}>
-                {p.mcpServers.map((m) => (
-                  <div key={m.name} className="flex items-baseline gap-3">
-                    <span className="min-w-0 flex-1 truncate font-mono text-xs text-mute">{m.name}</span>
-                    {/* One started as a command would run on the phone, outside the chat's sandbox. */}
-                    {!m.remote && <Unused />}
-                  </div>
-                ))}
-              </Part>
-            )}
-            {p.agents.length > 0 && (
-              <Part title={`${t("plugins.agents")} ${p.agents.length}`}>
-                {names(p.agents)}
-              </Part>
-            )}
-            {p.hooks.length > 0 && (
-              <Part title={`${t("plugins.hooks")} ${p.hooks.length}`} unused />
-            )}
-            {p.apps > 0 && <Part title={t("plugins.apps")} unused />}
-            {p.commands > 0 && <Part title={`${t("plugins.commands")} ${p.commands}`} unused />}
-          </div>
-          <div className="grid gap-2 pt-4">
-            {confirming ? (
-              <>
-                <p className="text-center text-sm text-ink">{t("plugins.removeTitle", { name: p.name })}</p>
-                <Button
-                  variant="danger"
-                  className="w-full"
-                  disabled={deleting}
-                  onClick={() => {
-                    setDeleting(true);
-                    deletePlugin(p.name)
-                      .then(onClose)
-                      .catch((e: Error) => toast(describeError(t, e.message), "error"))
-                      .finally(() => setDeleting(false));
-                  }}
-                >
-                  {t("common.delete")}
-                </Button>
-                <Button variant="ghost" className="w-full" onClick={() => setConfirming(false)}>
-                  {t("common.cancel")}
-                </Button>
-              </>
-            ) : (
-              <Button variant="ghost" className="w-full text-mute" onClick={() => setConfirming(true)}>
-                <Trash2 size={16} />
-                {t("common.delete")}
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-    </Sheet>
-  );
 }
 
 /** Where handed-over files go, the bucket, and what is kept (docs/adr/outputs.md). */

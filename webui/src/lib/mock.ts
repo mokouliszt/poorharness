@@ -230,6 +230,20 @@ export function createMockHost(emit: Emit) {
     s3: [{ chatId: "c_csv", name: "fix-parser-test.patch", size: 1_204, modifiedAt: now - 1.5 * H }],
   };
   const titleOf = (id: string) => chats.find((c: any) => c.id === id)?.title ?? null;
+  // What each plugin holds, for its files screen.
+  const pluginFiles: Record<string, Record<string, string>> = {
+    "review-kit": {
+      ".claude-plugin/plugin.json": '{\n  "name": "review-kit",\n  "version": "1.2.0",\n  "description": "Code review helpers"\n}\n',
+      ".mcp.json": '{\n  "mcpServers": {\n    "docs": { "type": "http", "url": "https://example.com/mcp" },\n    "lint": { "command": "node", "args": ["lint.js"] }\n  }\n}\n',
+      "skills/checklist/SKILL.md": "---\nname: checklist\ndescription: A review checklist.\n---\n\n# Review checklist\n\n- Tests cover the change\n- No secrets in the diff\n",
+      "agents/reviewer.md": "---\nname: reviewer\ndescription: Reviews code\ntools: Read, Grep\n---\n\nYou review code for correctness first, style second.\n",
+      "commands/review.md": "---\ndescription: Review the diff\n---\n\nReview $ARGUMENTS\n",
+      "commands/explain.md": "---\ndescription: Explain a file\n---\n\nExplain $ARGUMENTS\n",
+      "hooks/hooks.json": '{\n  "hooks": {\n    "PostToolUse": [{ "matcher": "Edit", "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/format.sh" }] }]\n  }\n}\n',
+      "scripts/format.sh": "#!/bin/sh\nprettier --write \"$1\"\n",
+      "README.md": "# review-kit\n\nCode review helpers for Claude Code.\n",
+    },
+  };
   const plugins: any[] = [
     {
       name: "review-kit",
@@ -239,7 +253,7 @@ export function createMockHost(emit: Emit) {
       files: 9,
       bytes: 12_480,
       hooksAllowed: false,
-      skills: [{ name: "checklist", description: "A review checklist." }],
+      skills: [{ name: "checklist", description: "A review checklist.", path: "skills/checklist" }],
       mcpServers: [
         { name: "docs", remote: true, url: "https://example.com/mcp" },
         { name: "lint", remote: false, command: "node" },
@@ -522,11 +536,33 @@ export function createMockHost(emit: Emit) {
         const pl = {
           name: "summarize", version: "0.3.0", description: "Summaries of long files.", format: "agent-plugins",
           files: 4, bytes: 3_210, hooksAllowed: false,
-          skills: [{ name: "summarize", description: "Summarizes a file." }, { name: "outline", description: "Outlines a file." }],
+          skills: [
+            { name: "summarize", description: "Summarizes a file.", path: "skills/summarize" },
+            { name: "outline", description: "Outlines a file.", path: "skills/outline" },
+          ],
           mcpServers: [], hooks: [], agents: [], commands: 0, apps: 0,
+        };
+        pluginFiles.summarize = {
+          "plugin.json": '{\n  "$schema": "https://agent-plugins.org/schemas/plugin.json",\n  "name": "summarize",\n  "version": "0.3.0"\n}\n',
+          "skills/summarize/SKILL.md": "---\nname: summarize\ndescription: Summarizes a file.\n---\n\nSummarize in five bullets.\n",
+          "skills/outline/SKILL.md": "---\nname: outline\ndescription: Outlines a file.\n---\n\nOutline the headings.\n",
+          "LICENSE": "MIT License\n",
         };
         if (!plugins.some((x) => x.name === pl.name)) plugins.push(pl);
         return { ...pl };
+      }
+      case "plugins.files": {
+        await sleep(150);
+        const files = pluginFiles[p.name];
+        if (!files) throw new Error("plugin_missing");
+        const list = Object.entries(files).map(([path, text]) => ({ path, size: new TextEncoder().encode(text).length })).sort((a, b) => a.path.localeCompare(b.path));
+        return { name: p.name, files: list, bytes: list.reduce((n, f) => n + f.size, 0) };
+      }
+      case "plugins.read": {
+        await sleep(120);
+        const text = pluginFiles[p.name]?.[p.path];
+        if (text === undefined) throw new Error("plugin_missing");
+        return { kind: "text", size: new TextEncoder().encode(text).length, text, truncated: false };
       }
       case "plugins.delete": {
         const i = plugins.findIndex((x) => x.name === p.name);

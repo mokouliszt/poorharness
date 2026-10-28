@@ -39,20 +39,20 @@ class SkillStoreTest {
     @Test
     fun readsTextImagesAndKnowsBinaries() {
         val s = store()
-        val md = s.read("ui-kit", "rules/forms.md") as SkillStore.Content.Text
+        val md = s.read("ui-kit", "rules/forms.md") as InstalledFiles.Content.Text
         assertEquals("日本語のルール\n", md.text)
-        val png = s.read("ui-kit", "assets/logo.png") as SkillStore.Content.Image
+        val png = s.read("ui-kit", "assets/logo.png") as InstalledFiles.Content.Image
         assertEquals("image/png", png.mime)
         assertEquals(7, Base64.getDecoder().decode(png.base64).size)
-        assertTrue(s.read("ui-kit", "assets/font.bin") is SkillStore.Content.Binary)
+        assertTrue(s.read("ui-kit", "assets/font.bin") is InstalledFiles.Content.Binary)
     }
 
     @Test
     fun longTextIsCutWithoutBreakingACharacter() {
         val s = store()
         // Three-byte characters, so the cut at MAX_TEXT falls inside one.
-        File(s.dir, "ui-kit/long.md").writeText("あ".repeat(SkillStore.MAX_TEXT / 3 + 10))
-        val text = s.read("ui-kit", "long.md") as SkillStore.Content.Text
+        File(s.dir, "ui-kit/long.md").writeText("あ".repeat(InstalledFiles.MAX_TEXT / 3 + 10))
+        val text = s.read("ui-kit", "long.md") as InstalledFiles.Content.Text
         assertTrue(text.truncated)
         assertTrue(text.text.all { it == 'あ' })
     }

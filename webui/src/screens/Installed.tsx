@@ -16,15 +16,26 @@ import {
   WrapText,
 } from "lucide-react";
 import { call } from "@/lib/bridge";
-import { deleteSkill, onBackClose, pop, push, toast } from "@/lib/store";
+import { deletePlugin, deleteSkill, loadPlugins, onBackClose, pop, push, toast, useStore } from "@/lib/store";
 import { describeError, useT } from "@/lib/i18n";
 import { fileSize } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import type { SkillContent, SkillFiles } from "@/lib/types";
+import type { InstalledContent, InstalledFiles, InstalledKind, PluginInfo } from "@/lib/types";
 import { TopBar } from "@/components/TopBar";
 import { Markdown } from "@/components/Markdown";
 import { Sheet } from "@/components/ui/Sheet";
 import { Button } from "@/components/ui/Button";
+
+/*
+ * What Settings shows of an installed skill or plugin: its files as they sit on the
+ * phone, to check that nothing was lost in the archive, and each file read-only
+ * (docs/adr/skills.md, docs/adr/plugins.md).
+ */
+
+const METHODS: Record<InstalledKind, { files: string; read: string }> = {
+  skill: { files: "skills.files", read: "skills.read" },
+  plugin: { files: "plugins.files", read: "plugins.read" },
+};
 
 /** A folder of the tree, built from the flat list the host sends. */
 interface Dir {
@@ -35,7 +46,7 @@ interface Dir {
   count: number;
 }
 
-function buildTree(files: SkillFiles["files"]): Dir {
+function buildTree(files: InstalledFiles["files"]): Dir {
   const root: Dir = { name: "", path: "", dirs: [], files: [], count: 0 };
   for (const f of files) {
     const parts = f.path.split("/");
@@ -69,7 +80,7 @@ function allDirs(d: Dir): string[] {
 /** Up to this many files the tree opens whole; a bigger one opens at its top level. */
 const OPEN_ALL_UP_TO = 40;
 
-const CODE = /\.(py|js|mjs|cjs|ts|tsx|jsx|sh|bash|rb|go|rs|java|kt|c|h|cpp|css|scss|html|sql|ps1|bat)$/i;
+const CODE = /\.(py|js|mjs|cjs|ts|tsx|jsx|sh|bash|rb|go|rs|java|kt|kts|c|h|cpp|css|scss|html|sql|ps1|bat)$/i;
 const DATA = /\.(json|ya?ml|toml|xml|csv|tsv|ini|cfg)$/i;
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|ico)$/i;
 
@@ -81,25 +92,81 @@ function iconFor(name: string) {
   return FileIcon;
 }
 
-/**
- * An installed skill as it sits on the phone: every file and folder, to check
- * that nothing was lost in the archive. A file opens in [SkillFile]; the skill
- * is deleted from here.
- */
+/** "1 file", "3 files" (Japanese has one form). */
+export function count(t: ReturnType<typeof useT>, what: "files" | "folders", n: number): string {
+  if (what === "files") return n === 1 ? t("skill.oneFile") : t("skill.files", { n });
+  return n === 1 ? t("skill.oneFolder") : t("skill.folders", { n });
+}
+
+/** An installed skill: its description, then its files. */
 export function Skill({ name }: { name: string }) {
   const t = useT();
-  const [data, setData] = useState<SkillFiles | null>(null);
+  return (
+    <InstalledScreen
+      kind="skill"
+      name={name}
+      header={(data) => data.description && <p className="phrase text-sm text-mute">{data.description}</p>}
+      deleteLabel={t("skill.delete")}
+      confirmTitle={t("skills.removeTitle", { name })}
+      remove={() => deleteSkill(name)}
+    />
+  );
+}
+
+/** An installed plugin: what opencode takes from it, then its files. */
+export function Plugin({ name }: { name: string }) {
+  const t = useT();
+  const plugin = useStore((s) => (s.plugins ?? []).find((p) => p.name === name) ?? null);
+  // Opened straight after an add, before the list was read.
+  useEffect(() => {
+    if (!plugin) void loadPlugins().catch(() => undefined);
+  }, [plugin]);
+  return (
+    <InstalledScreen
+      kind="plugin"
+      name={name}
+      version={plugin?.version}
+      header={() => plugin && <PluginParts plugin={plugin} />}
+      deleteLabel={t("plugin.delete")}
+      confirmTitle={t("plugins.removeTitle", { name })}
+      remove={() => deletePlugin(name)}
+    />
+  );
+}
+
+function InstalledScreen({
+  kind,
+  name,
+  version,
+  header,
+  deleteLabel,
+  confirmTitle,
+  remove,
+}: {
+  kind: InstalledKind;
+  name: string;
+  version?: string | null;
+  header: (data: InstalledFiles) => ReactNode;
+  deleteLabel: string;
+  confirmTitle: string;
+  remove: () => Promise<void>;
+}) {
+  const t = useT();
+  const [data, setData] = useState<InstalledFiles | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [closed, setClosed] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    call<SkillFiles>("skills.files", { name }).then((d) => {
-      if (d.files.length > OPEN_ALL_UP_TO) setClosed(new Set(allDirs(buildTree(d.files)).filter((p) => p.includes("/"))));
-      setData(d);
-    }, (e: Error) => setError(e.message));
-  }, [name]);
+    call<InstalledFiles>(METHODS[kind].files, { name }).then(
+      (d) => {
+        if (d.files.length > OPEN_ALL_UP_TO) setClosed(new Set(allDirs(buildTree(d.files)).filter((p) => p.includes("/"))));
+        setData(d);
+      },
+      (e: Error) => setError(e.message),
+    );
+  }, [kind, name]);
   useEffect(() => (confirming && !deleting ? onBackClose(() => setConfirming(false)) : undefined), [confirming, deleting]);
 
   const tree = useMemo(() => (data ? buildTree(data.files) : null), [data]);
@@ -113,6 +180,7 @@ export function Skill({ name }: { name: string }) {
       else next.add(path);
       return next;
     });
+  const open = (path: string) => push({ name: "installedFile", kind, owner: name, path });
 
   let body: ReactNode;
   if (error) body = <Center>{describeError(t, error)}</Center>;
@@ -126,23 +194,21 @@ export function Skill({ name }: { name: string }) {
     body = (
       <div className="scroll-quiet min-h-0 flex-1 overflow-y-auto px-2 pb-6">
         <div className="px-3 pb-4">
-          {data.description && <p className="phrase text-sm text-mute">{data.description}</p>}
+          {header(data)}
           <div className="mt-3 flex flex-wrap gap-2">
             <Stat>{count(t, "files", data.files.length)}</Stat>
             {dirs.length > 0 && <Stat>{count(t, "folders", dirs.length)}</Stat>}
             <Stat>{fileSize(data.bytes)}</Stat>
           </div>
         </div>
-        <div>
-          <Branch dir={tree} depth={0} closed={closed} toggle={toggle} open={(path) => push({ name: "skillFile", skill: name, path })} />
-        </div>
+        <Branch dir={tree} depth={0} lead={kind === "skill" ? "SKILL.md" : null} closed={closed} toggle={toggle} open={open} />
         <div className="px-1 pt-6">
           <button
             onClick={() => setConfirming(true)}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-danger active:bg-surface"
           >
             <Trash2 size={17} className="shrink-0" />
-            <span className="text-base">{t("skill.delete")}</span>
+            <span className="text-base">{deleteLabel}</span>
           </button>
         </div>
       </div>
@@ -152,7 +218,12 @@ export function Skill({ name }: { name: string }) {
   return (
     <div className="flex h-full flex-col">
       <TopBar
-        title={<span className="font-mono">{name}</span>}
+        title={
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="truncate font-mono">{name}</span>
+            {version && <span className="shrink-0 font-mono text-xs text-mute">{version}</span>}
+          </span>
+        }
         right={
           dirs.length > 0 && (
             <IconButton
@@ -165,7 +236,7 @@ export function Skill({ name }: { name: string }) {
         }
       />
       {body}
-      <Sheet open={confirming} onClose={() => !deleting && setConfirming(false)} title={t("skills.removeTitle", { name })}>
+      <Sheet open={confirming} onClose={() => !deleting && setConfirming(false)} title={confirmTitle}>
         <div className="space-y-3 px-5 pb-2">
           <Button
             variant="danger"
@@ -173,7 +244,7 @@ export function Skill({ name }: { name: string }) {
             disabled={deleting}
             onClick={() => {
               setDeleting(true);
-              deleteSkill(name)
+              remove()
                 .then(() => {
                   setConfirming(false);
                   pop();
@@ -193,42 +264,124 @@ export function Skill({ name }: { name: string }) {
   );
 }
 
+/** What a plugin holds, and which parts opencode does not use (docs/adr/plugins.md). */
+function PluginParts({ plugin: p }: { plugin: PluginInfo }) {
+  const t = useT();
+  const names = (items: { name: string }[]) => <div className="phrase font-mono text-xs text-mute">{items.map((i) => i.name).join(", ")}</div>;
+  return (
+    <>
+      {p.description && <p className="phrase text-sm text-mute">{p.description}</p>}
+      <div className="mt-3 divide-y divide-line rounded-xl border border-line px-3">
+        {p.skills.length > 0 && (
+          <Part title={`${t("plugins.skills")} ${p.skills.length}`}>
+            {/* Each opens on its SKILL.md. */}
+            <div className="flex flex-wrap gap-1.5">
+              {p.skills.map((s) => (
+                <button
+                  key={s.name}
+                  onClick={() => s.path && push({ name: "installedFile", kind: "plugin", owner: p.name, path: `${s.path}/SKILL.md` })}
+                  disabled={!s.path}
+                  className="rounded-full border border-line px-2 py-0.5 font-mono text-xs text-ink active:bg-surface"
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </Part>
+        )}
+        {p.mcpServers.length > 0 && (
+          <Part title={`${t("plugins.mcp")} ${p.mcpServers.length}`}>
+            {p.mcpServers.map((m) => (
+              <div key={m.name} className="flex items-baseline gap-3">
+                <span className="min-w-0 flex-1 truncate font-mono text-xs text-mute">{m.name}</span>
+                {/* One started as a command would run on the phone, outside the chat's sandbox. */}
+                {!m.remote && <Unused />}
+              </div>
+            ))}
+          </Part>
+        )}
+        {p.agents.length > 0 && <Part title={`${t("plugins.agents")} ${p.agents.length}`}>{names(p.agents)}</Part>}
+        {p.hooks.length > 0 && <Part title={`${t("plugins.hooks")} ${p.hooks.length}`} unused />}
+        {p.apps > 0 && <Part title={t("plugins.apps")} unused />}
+        {p.commands > 0 && <Part title={`${t("plugins.commands")} ${p.commands}`} unused />}
+        {p.skills.length + p.mcpServers.length + p.agents.length + p.hooks.length + p.apps + p.commands === 0 && (
+          <p className="py-2.5 text-sm text-mute">{t("plugin.nothing")}</p>
+        )}
+      </div>
+    </>
+  );
+}
+
+/** "Skills 2 · MCP servers 1", for the plugin's row in Settings. */
+export function partsSummary(t: ReturnType<typeof useT>, p: PluginInfo): string {
+  const parts: [Parameters<typeof t>[0], number][] = [
+    ["plugins.skills", p.skills.length],
+    ["plugins.mcp", p.mcpServers.length],
+    ["plugins.agents", p.agents.length],
+    ["plugins.hooks", p.hooks.length],
+    ["plugins.apps", p.apps],
+    ["plugins.commands", p.commands],
+  ];
+  return parts.filter(([, n]) => n > 0).map(([k, n]) => `${t(k)} ${n}`).join(" · ");
+}
+
+/** Marks a part opencode does not use. */
+function Unused() {
+  const t = useT();
+  return <span className="shrink-0 text-xs text-mute">{t("plugins.unused")}</span>;
+}
+
+function Part({ title, unused, children }: { title: string; unused?: boolean; children?: ReactNode }) {
+  return (
+    <div className="py-2.5">
+      <div className="flex items-baseline gap-3">
+        <span className="flex-1 text-sm text-ink">{title}</span>
+        {unused && <Unused />}
+      </div>
+      {children && <div className="mt-1.5 space-y-1">{children}</div>}
+    </div>
+  );
+}
+
 function Branch({
   dir,
   depth,
+  lead,
   closed,
   toggle,
   open,
 }: {
   dir: Dir;
   depth: number;
+  /** A file that leads the top level (a skill's SKILL.md, which the agent reads first). */
+  lead: string | null;
   closed: Set<string>;
   toggle: (path: string) => void;
   open: (path: string) => void;
 }) {
   const t = useT();
-  // Folders first, as in any file browser; at the top, SKILL.md leads (the agent reads it first).
-  const lead = depth === 0 ? dir.files.filter((f) => f.name === "SKILL.md") : [];
-  const rest = dir.files.filter((f) => !lead.includes(f));
+  // Folders first, as in any file browser.
+  const first = depth === 0 && lead ? dir.files.filter((f) => f.name === lead) : [];
+  const rest = dir.files.filter((f) => !first.includes(f));
   const fileRow = (f: Dir["files"][number]) => {
     const Icon = iconFor(f.name);
     return (
-          <button
-            key={f.path}
-            onClick={() => open(f.path)}
-            className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left active:bg-surface"
-          >
-            {/* Where a folder has its chevron, so names line up. */}
-            <span className="w-4 shrink-0" aria-hidden />
-            <Icon size={17} className="shrink-0 text-mute" />
-            <span className={cn("min-w-0 flex-1 truncate font-mono text-sm", f.name === "SKILL.md" ? "text-paper" : "text-ink")}>{f.name}</span>
-            <span className="shrink-0 font-mono text-xs text-mute">{fileSize(f.size)}</span>
-          </button>
+      <button
+        key={f.path}
+        onClick={() => open(f.path)}
+        className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left active:bg-surface"
+      >
+        {/* Where a folder has its chevron, so names line up. */}
+        <span className="w-4 shrink-0" aria-hidden />
+        <Icon size={17} className="shrink-0 text-mute" />
+        <span className={cn("min-w-0 flex-1 truncate font-mono text-sm", first.includes(f) ? "text-paper" : "text-ink")}>{f.name}</span>
+        <span className="shrink-0 font-mono text-xs text-mute">{fileSize(f.size)}</span>
+      </button>
     );
   };
   return (
     <div className={cn(depth > 0 && "ml-[21px] border-l border-line pl-1")}>
-      {lead.map(fileRow)}
+      {first.map(fileRow)}
       {dir.dirs.map((d) => {
         const isOpen = !closed.has(d.path);
         return (
@@ -245,7 +398,7 @@ function Branch({
               <span className="min-w-0 flex-1 truncate font-mono text-sm text-paper">{d.name}</span>
               <span className="shrink-0 text-xs text-mute">{count(t, "files", d.count)}</span>
             </button>
-            {isOpen && <Branch dir={d} depth={depth + 1} closed={closed} toggle={toggle} open={open} />}
+            {isOpen && <Branch dir={d} depth={depth + 1} lead={lead} closed={closed} toggle={toggle} open={open} />}
           </div>
         );
       })}
@@ -255,12 +408,12 @@ function Branch({
 }
 
 /**
- * One file of an installed skill, read-only: text with line numbers (Markdown can
- * also be shown rendered), an image as itself, anything else by its size.
+ * One file of an installed skill or plugin, read-only: text with line numbers
+ * (Markdown can also be shown rendered), an image as itself, anything else by its size.
  */
-export function SkillFile({ skill, path }: { skill: string; path: string }) {
+export function InstalledFile({ kind, owner, path }: { kind: InstalledKind; owner: string; path: string }) {
   const t = useT();
-  const [content, setContent] = useState<SkillContent | null>(null);
+  const [content, setContent] = useState<InstalledContent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [wrap, setWrap] = useState(false);
   const [rendered, setRendered] = useState(false);
@@ -269,8 +422,8 @@ export function SkillFile({ skill, path }: { skill: string; path: string }) {
   const isMarkdown = /\.(md|markdown)$/i.test(fileName);
 
   useEffect(() => {
-    call<SkillContent>("skills.read", { name: skill, path }).then(setContent, (e: Error) => setError(e.message));
-  }, [skill, path]);
+    call<InstalledContent>(METHODS[kind].read, { name: owner, path }).then(setContent, (e: Error) => setError(e.message));
+  }, [kind, owner, path]);
 
   const text = content?.kind === "text" ? content.text : null;
   const lines = useMemo(() => (text == null ? [] : text.replace(/\n$/, "").split("\n")), [text]);
@@ -304,7 +457,7 @@ export function SkillFile({ skill, path }: { skill: string; path: string }) {
       </Center>
     );
   } else if (isMarkdown && rendered) {
-    // The frontmatter (a skill's name and description) is metadata: shown as itself, above the prose.
+    // Frontmatter (a skill's name and description) is metadata: shown as itself, above the prose.
     const front = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(content.text);
     body = (
       <div className="scroll-quiet min-h-0 flex-1 overflow-y-auto px-5 pb-8">
@@ -365,7 +518,7 @@ export function SkillFile({ skill, path }: { skill: string; path: string }) {
       />
       <div className="flex shrink-0 items-center gap-3 px-4 pb-3">
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-mute">
-          {skill}/{path}
+          {owner}/{path}
           {content ? ` · ${fileSize(content.size)}` : ""}
           {dims ? ` · ${dims.w} × ${dims.h}` : ""}
         </span>
@@ -396,20 +549,10 @@ function Line({ n, children }: { n: number; children: string }) {
 
 function Segment({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
   return (
-    <button
-      onClick={onClick}
-      aria-pressed={on}
-      className={cn("h-7 rounded-full px-3 transition-colors", on ? "bg-paper text-void" : "text-mute")}
-    >
+    <button onClick={onClick} aria-pressed={on} className={cn("h-7 rounded-full px-3 transition-colors", on ? "bg-paper text-void" : "text-mute")}>
       {children}
     </button>
   );
-}
-
-/** "1 file", "3 files" (Japanese has one form). */
-export function count(t: ReturnType<typeof useT>, what: "files" | "folders", n: number): string {
-  if (what === "files") return n === 1 ? t("skill.oneFile") : t("skill.files", { n });
-  return n === 1 ? t("skill.oneFolder") : t("skill.folders", { n });
 }
 
 function Stat({ children }: { children: ReactNode }) {
@@ -426,10 +569,7 @@ function IconButton(props: { label: string; pressed?: boolean; onClick: () => vo
       onClick={props.onClick}
       aria-label={props.label}
       aria-pressed={props.pressed}
-      className={cn(
-        "flex h-10 w-10 items-center justify-center rounded-full active:bg-surface",
-        props.pressed ? "bg-surface text-paper" : "text-mute",
-      )}
+      className={cn("flex h-10 w-10 items-center justify-center rounded-full active:bg-surface", props.pressed ? "bg-surface text-paper" : "text-mute")}
     >
       {props.children}
     </button>

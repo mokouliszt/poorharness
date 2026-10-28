@@ -28,7 +28,7 @@ import dev.mokouliszt.poordsh.runtime.Tools
 import dev.mokouliszt.poordsh.secrets.SecretStore
 import dev.mokouliszt.poordsh.settings.Settings
 import dev.mokouliszt.poordsh.skills.SkillPackage
-import dev.mokouliszt.poordsh.skills.SkillStore
+import dev.mokouliszt.poordsh.skills.InstalledFiles
 import dev.mokouliszt.poordsh.storage.S3Storage
 import dev.mokouliszt.poordsh.tensorlake.SandboxManager
 import dev.mokouliszt.poordsh.tensorlake.SandboxManager.Companion.WORKSPACE
@@ -178,18 +178,7 @@ class WebBridge(
                 "bytes" to files.sumOf { it.size },
             )
         }
-        "skills.read" -> {
-            val content = try {
-                graph.skills.read(p.getString("name"), p.getString("path"))
-            } catch (_: IllegalArgumentException) {
-                throw IOException("skill_missing")
-            }
-            when (content) {
-                is SkillStore.Content.Text -> jsonOf("kind" to "text", "size" to content.size, "text" to content.text, "truncated" to content.truncated)
-                is SkillStore.Content.Image -> jsonOf("kind" to "image", "size" to content.size, "mime" to content.mime, "data" to content.base64)
-                is SkillStore.Content.Binary -> jsonOf("kind" to "binary", "size" to content.size)
-            }
-        }
+        "skills.read" -> contentJson("skill_missing") { graph.skills.read(p.getString("name"), p.getString("path")) }
 
         // --- plugins (Settings) ---
         "plugins.list" -> JSONArray().apply { graph.plugins.list().forEach { put(pluginJson(it)) } }
@@ -204,6 +193,16 @@ class WebBridge(
             pluginJson(info)
         }
         "plugins.delete" -> { graph.plugins.delete(p.getString("name")); null }
+        "plugins.files" -> {
+            val name = p.getString("name")
+            val files = graph.plugins.files(name) ?: throw IOException("plugin_missing")
+            jsonOf(
+                "name" to name,
+                "files" to JSONArray().apply { files.forEach { put(jsonOf("path" to it.path, "size" to it.size)) } },
+                "bytes" to files.sumOf { it.size },
+            )
+        }
+        "plugins.read" -> contentJson("plugin_missing") { graph.plugins.read(p.getString("name"), p.getString("path")) }
         "chat.abort" -> { graph.chats.abort(p.getString("sessionId")); null }
         "approval.reply" -> {
             val requestId = p.getString("requestId")
@@ -636,6 +635,20 @@ class WebBridge(
     }
 
     /** A plugin as Settings shows it: what it holds, and which engine uses each part (docs/bridge-protocol.md). */
+    /** A file of an installed skill or plugin, for its viewer; [missing] when it is not there. */
+    private fun contentJson(missing: String, read: () -> InstalledFiles.Content): JSONObject {
+        val content = try {
+            read()
+        } catch (_: IllegalArgumentException) {
+            throw IOException(missing)
+        }
+        return when (content) {
+            is InstalledFiles.Content.Text -> jsonOf("kind" to "text", "size" to content.size, "text" to content.text, "truncated" to content.truncated)
+            is InstalledFiles.Content.Image -> jsonOf("kind" to "image", "size" to content.size, "mime" to content.mime, "data" to content.base64)
+            is InstalledFiles.Content.Binary -> jsonOf("kind" to "binary", "size" to content.size)
+        }
+    }
+
     private fun pluginJson(info: PluginStore.Info): JSONObject {
         val m = info.manifest
         return jsonOf(
@@ -645,7 +658,7 @@ class WebBridge(
             "format" to m.format.id,
             "files" to info.files,
             "bytes" to info.bytes,
-            "skills" to jsonArrayOf(m.skills.map { jsonOf("name" to it.name, "description" to it.description) }),
+            "skills" to jsonArrayOf(m.skills.map { jsonOf("name" to it.name, "description" to it.description, "path" to it.path) }),
             "mcpServers" to jsonArrayOf(m.mcpServers.map { jsonOf("name" to it.name, "remote" to (it.url != null), "url" to it.url, "command" to it.command) }),
             "hooks" to jsonArrayOf(m.hooks.map { jsonOf("event" to it.event, "command" to it.command) }),
             "agents" to jsonArrayOf(m.agents.map { jsonOf("name" to it.name, "description" to it.description) }),

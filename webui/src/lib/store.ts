@@ -18,6 +18,7 @@ import type {
   Settings,
   PluginInfo,
   Shelf,
+  InstalledKind,
   SkillInfo,
   StorageInfo,
   TodoItem,
@@ -34,9 +35,11 @@ export type Screen =
   | { name: "licenses" }
   | { name: "outputs"; shelf: Shelf }
   | { name: "repos" }
-  /** An installed skill's files (docs/adr/skills.md); [path] relative to the skill's folder. */
+  /** An installed skill's or plugin's files (docs/adr/skills.md, plugins.md). */
   | { name: "skill"; skill: string }
-  | { name: "skillFile"; skill: string; path: string };
+  | { name: "plugin"; plugin: string }
+  /** One of them; [path] relative to the skill's or plugin's folder. */
+  | { name: "installedFile"; kind: InstalledKind; owner: string; path: string };
 
 export interface Toast {
   id: number;
@@ -107,7 +110,6 @@ interface State {
   /** Installed plugins (Settings); null until loaded. */
   plugins: PluginInfo[] | null;
   /** The plugin whose sheet is open in Settings. */
-  pluginSheet: string | null;
   /** Where handed-over files go, and the connected bucket; null until loaded. */
   storage: StorageInfo | null;
   /** The bucket sheet in Settings. */
@@ -157,7 +159,6 @@ const initial: State = {
   stageProgress: {},
   skills: null,
   plugins: null,
-  pluginSheet: null,
   storage: null,
   s3Sheet: false,
 };
@@ -222,10 +223,6 @@ export function pop(): boolean {
   }
   if (s.providerKeySheet) {
     set({ providerKeySheet: null });
-    return true;
-  }
-  if (s.pluginSheet) {
-    set({ pluginSheet: null });
     return true;
   }
   if (s.s3Sheet) {
@@ -589,9 +586,6 @@ export async function setDestination(destination: Shelf) {
   set((s) => ({ storage: s.storage ? { ...s.storage, destination } : s.storage }));
 }
 
-export function setPluginSheet(name: string | null) {
-  set({ pluginSheet: name });
-}
 
 export function takeDraft(sessionId: string): string | undefined {
   const text = get().drafts[sessionId];

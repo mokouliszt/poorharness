@@ -6,6 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -149,6 +150,42 @@ class PluginStoreTest {
         store.delete("beta")
         assertTrue(store.state().snapshot.folders.isEmpty())
         assertTrue(store.state().isEmpty)
+    }
+
+    @Test
+    fun anInstalledPluginsFilesCanBeLookedAt() {
+        val store = PluginStore(tmp.newFolder("plugins"))
+        store.install(claudePlugin())
+        val files = store.files("review-kit")!!.map { it.path }
+        assertTrue(".claude-plugin/plugin.json" in files)
+        assertTrue("skills/checklist/SKILL.md" in files)
+        val text = store.read("review-kit", "scripts/run.sh") as dev.mokouliszt.poordsh.skills.InstalledFiles.Content.Text
+        assertEquals("#!/bin/sh\necho run\n", text.text)
+        assertNull(store.files("missing"))
+        for ((name, path) in listOf("review-kit" to "../x", "missing" to "x", "../plugins" to "x")) {
+            try {
+                store.read(name, path)
+                fail("$name/$path")
+            } catch (_: IllegalArgumentException) {
+            }
+        }
+    }
+
+    @Test
+    fun skillsListedOneByOneInNestedFolders() {
+        // As Google's android-skills plugin does: each skill's own folder, at any depth.
+        val store = PluginStore(tmp.newFolder("plugins"))
+        val info = store.install(zip(
+            ".codex-plugin/plugin.json" to """{"name":"android-kit","version":"1.0.0","skills":["./camera/camerax","./device-ai/litert/litert-lm"]}""",
+            ".claude-plugin/plugin.json" to """{"name":"android-kit","skills":["./camera/camerax","./device-ai/litert/litert-lm"]}""",
+            ".claude-plugin/marketplace.json" to """{"name":"android-kit","plugins":[{"name":"android-kit","source":"./"}]}""",
+            "camera/camerax/SKILL.md" to "---\nname: camerax\ndescription: CameraX.\n---\nUse CameraX.\n",
+            "device-ai/litert/litert-lm/SKILL.md" to "---\nname: litert-lm\ndescription: LiteRT-LM.\n---\nRun it.\n",
+            "device-ai/litert/litert-lm/references/api.md" to "api",
+        ))
+        assertEquals(listOf("camerax", "litert-lm"), info.manifest.skills.map { it.name })
+        assertEquals(listOf("camera/camerax", "device-ai/litert/litert-lm"), info.manifest.skills.map { it.path })
+        assertEquals(listOf("camera/camerax", "device-ai/litert/litert-lm"), info.manifest.skillRoots)
     }
 
     @Test

@@ -95,7 +95,8 @@ start. Optional:
   read any file.
 - Settings → Plugins adds a plugin from a `.zip` or `.plugin` archive (Agent
   Plugins, Codex, Claude or Cursor format). opencode uses its skills, its MCP
-  servers reached by URL and its agents; tap a plugin to see what is used.
+  servers reached by URL and its agents; tap a plugin to see what is used,
+  its file tree, and each file's contents.
 - Files the agent puts in `/tmp/workspace/outputs` are handed to you when its
   turn ends and show under its reply: tap one to save it to
   Download/PoorHarness, or share it. They are kept on the phone, or under

@@ -168,16 +168,19 @@ export interface SkillInfo {
   bytes: number;
 }
 
-/** An installed skill's files (`skills.files`), paths relative to its folder. */
-export interface SkillFiles {
+export type InstalledKind = "skill" | "plugin";
+
+/** An installed skill's or plugin's files (`skills.files`, `plugins.files`), paths relative to its folder. */
+export interface InstalledFiles {
   name: string;
-  description: string | null;
+  /** Skills only. */
+  description?: string | null;
   files: { path: string; size: number }[];
   bytes: number;
 }
 
-/** One file of a skill (`skills.read`): text (cut past 256 KB), an image, or neither. */
-export type SkillContent =
+/** One of those files (`skills.read`, `plugins.read`): text (cut past 256 KB), an image, or neither. */
+export type InstalledContent =
   | { kind: "text"; size: number; text: string; truncated: boolean }
   | { kind: "image"; size: number; mime: string; data: string }
   | { kind: "binary"; size: number };
@@ -191,7 +194,8 @@ export interface PluginInfo {
   format: string;
   files: number;
   bytes: number;
-  skills: { name: string; description: string }[];
+  /** [path]: the skill's folder in the plugin. */
+  skills: { name: string; description: string; path?: string }[];
   /** remote: reached by URL (used); otherwise started as a command (not used). */
   mcpServers: { name: string; remote: boolean; url?: string | null; command?: string | null }[];
   hooks: { event: string; command: string }[];

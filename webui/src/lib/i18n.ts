@@ -106,6 +106,8 @@ const en = {
   "plugins.apps": "Apps",
   "plugins.unused": "Not supported",
   "plugins.removeTitle": "Delete {name}?",
+  "plugin.delete": "Delete plugin",
+  "plugin.nothing": "Nothing opencode can use",
 
   "files.title": "Files",
   "files.root": "Workspace",
@@ -268,6 +270,7 @@ const en = {
   "err.sandboxMissing": "This chat has no files.",
   "err.fileMissing": "File not found.",
   "err.skillMissing": "This skill or file could not be found.",
+  "err.pluginMissing": "This plugin or file could not be found.",
   "err.pluginUnavailable": "opencode couldn't load its sandbox tools. Check the connection and try again.",
   "err.noSpace": "The files don't fit in this chat's sandbox.",
   "err.attachmentMissing": "An attached file is gone. Attach it again.",
@@ -435,6 +438,8 @@ const ja: Record<Key, string> = {
   "plugins.apps": "アプリ",
   "plugins.unused": "非対応",
   "plugins.removeTitle": "{name} を削除しますか？",
+  "plugin.delete": "プラグインを削除",
+  "plugin.nothing": "opencodeで使える要素はありません",
 
   "files.title": "ファイル",
   "files.root": "作業フォルダ",
@@ -596,7 +601,8 @@ const ja: Record<Key, string> = {
   "err.sandboxGone": "サンドボックスが停止しました。もう一度送信してください。",
   "err.sandboxMissing": "このチャットにはファイルがありません。",
   "err.fileMissing": "ファイルが見つかりません。",
-  "err.skillMissing": "このスキルまたはファイルは見つかりません。",
+  "err.skillMissing": "このスキルまたはファイルが見つかりません。",
+  "err.pluginMissing": "このプラグインまたはファイルが見つかりません。",
   "err.pluginUnavailable": "opencodeがサンドボックス用ツールを読み込めませんでした。通信状況を確認して再試行してください。",
   "err.noSpace": "ファイルがこのチャットのサンドボックスに収まりません。",
   "err.attachmentMissing": "添付ファイルが見つかりません。もう一度添付してください。",
@@ -701,6 +707,7 @@ const ERROR_CODES: [string, Key][] = [
   ["output_failed", "err.outputFailed"],
   ["system_prompt_too_long", "err.systemPromptTooLong"],
   ["skill_missing", "err.skillMissing"],
+  ["plugin_missing", "err.pluginMissing"],
 ];
 
 /** A host error in the user's language when it is one of the known codes; otherwise as given. */
