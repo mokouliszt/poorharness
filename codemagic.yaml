@@ -1,0 +1,26 @@
+# Codemagic builds for PoorHarness users (docs/adr/codemagic-builds.md).
+#
+# This workflow does not build this repository. The app adds this repository to
+# the user's own Codemagic account and starts the workflow through Codemagic's
+# API with POORHARNESS_SCRIPT, a link that expires in a few hours to a script
+# the app wrote for that one build in the user's bucket. The script fetches a
+# git bundle from the bucket, runs Gradle and puts the log and the APKs back
+# there. Everything that changes between app versions is in that script, so
+# this file stays as it is.
+workflows:
+  poorharness-build:
+    name: PoorHarness build
+    # The machine type with free minutes on a personal account.
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    cache:
+      cache_paths:
+        - $HOME/.gradle/caches
+        - $HOME/.gradle/wrapper
+    scripts:
+      - name: Build
+        script: |
+          set -eu
+          script="$HOME/poorharness-build.sh"
+          curl -fsSL --retry 3 -o "$script" "$POORHARNESS_SCRIPT"
+          bash "$script"
