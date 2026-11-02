@@ -218,6 +218,7 @@ const en = {
   "venice.none": "No key",
   "venice.get": "Get a key",
   "models.chatOnly": "Chat only",
+  "models.gone": "{from} is no longer available. Switched to {to}.",
 
   "place.phone": "On device",
   "place.cloud": "Cloud",
@@ -271,6 +272,7 @@ const en = {
   "err.fileMissing": "File not found.",
   "err.skillMissing": "This skill or file could not be found.",
   "err.pluginMissing": "This plugin or file could not be found.",
+  "err.modelGone": "This model is no longer available. Pick another one and send again.",
   "err.pluginUnavailable": "opencode couldn't load its sandbox tools. Check the connection and try again.",
   "err.noSpace": "The files don't fit in this chat's sandbox.",
   "err.attachmentMissing": "An attached file is gone. Attach it again.",
@@ -550,6 +552,7 @@ const ja: Record<Key, string> = {
   "venice.none": "キー未登録",
   "venice.get": "キーを取得",
   "models.chatOnly": "チャットのみ",
+  "models.gone": "{from} は使えなくなったため、{to} に切り替えました",
 
   "place.phone": "端末内",
   "place.cloud": "クラウド",
@@ -603,6 +606,7 @@ const ja: Record<Key, string> = {
   "err.fileMissing": "ファイルが見つかりません。",
   "err.skillMissing": "このスキルまたはファイルが見つかりません。",
   "err.pluginMissing": "このプラグインまたはファイルが見つかりません。",
+  "err.modelGone": "このモデルは使えなくなりました。別のモデルを選んで送り直してください。",
   "err.pluginUnavailable": "opencodeがサンドボックス用ツールを読み込めませんでした。通信状況を確認して再試行してください。",
   "err.noSpace": "ファイルがこのチャットのサンドボックスに収まりません。",
   "err.attachmentMissing": "添付ファイルが見つかりません。もう一度添付してください。",
@@ -708,6 +712,7 @@ const ERROR_CODES: [string, Key][] = [
   ["system_prompt_too_long", "err.systemPromptTooLong"],
   ["skill_missing", "err.skillMissing"],
   ["plugin_missing", "err.pluginMissing"],
+  ["model_gone", "err.modelGone"],
 ];
 
 /** A host error in the user's language when it is one of the known codes; otherwise as given. */

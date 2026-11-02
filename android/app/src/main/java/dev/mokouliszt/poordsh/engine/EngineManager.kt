@@ -170,6 +170,8 @@ class EngineManager(
     suspend fun refreshCatalog(b: AgentBackend, discover: Boolean = false) {
         writeAtomically(cacheFile(b.id, "models"), b.models(discover).toString())
         discoveryErrors.remove(b.id)
+        // The picker holds its own copy: a model retired upstream would stay selected.
+        EventBus.emit("models.changed", jsonOf("backend" to b.id))
     }
 
     private fun writeAtomically(file: File, text: String) {

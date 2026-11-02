@@ -25,8 +25,10 @@ model and variant while the parent stayed on its own).
 - When set, every subagent gets it: `agent.general`, `agent.explore` and each
   plugin agent receive `model` and, if a level was picked, `variant`.
 - It reaches opencode at its next start, like the other options. A model whose
-  provider has no key any more (OpenCode Zen's free models need none) is left
-  out at start, so subagents fall back to the turn's model instead of failing.
+  provider has no key any more (OpenCode Zen's free models need none), or that a
+  whitelisted provider no longer offers, is left out at start, so subagents fall
+  back to the turn's model instead of failing. The setting stays, should the
+  model come back.
 
 ## Consequences
 

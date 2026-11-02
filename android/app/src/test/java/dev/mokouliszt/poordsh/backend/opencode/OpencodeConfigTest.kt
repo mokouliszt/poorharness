@@ -11,6 +11,16 @@ import org.junit.Test
 /** opencode must not be offered anything PoorHarness has not placed in the sandbox (docs/adr/opencode-tools-fail-closed.md). */
 class OpencodeConfigTest {
     @Test
+    fun aModelOutsideItsProvidersWhitelistIsNotOffered() {
+        val blocks = mapOf("orcarouter" to OrcaRouter.providerConfig(listOf(FreeGateway.Model("z-ai/glm-5.3-flash-free", "GLM", null, null, emptyList(), null))))
+        fun ref(id: String) = ModelRef.parse(id, null)
+        assertTrue(OpencodeConfig.offers(blocks, ref("opencode:orcarouter/z-ai/glm-5.3-flash-free")))
+        assertFalse(OpencodeConfig.offers(blocks, ref("opencode:orcarouter/orca/retired-free")))
+        // No block, no list of the app's: opencode has its own.
+        assertTrue(OpencodeConfig.offers(blocks, ref("opencode:opencode/big-pickle")))
+    }
+
+    @Test
     fun deniesByDefaultInEveryMode() {
         for (a in Approval.entries) {
             val p = OpencodeConfig.permission(a, emptySet())

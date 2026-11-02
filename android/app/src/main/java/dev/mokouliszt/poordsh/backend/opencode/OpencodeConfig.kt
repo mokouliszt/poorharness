@@ -191,6 +191,12 @@ object OpencodeConfig {
         paths.hostPathOf(INSTRUCTIONS_PATH).apply { parentFile?.mkdirs(); writeText(SystemPrompt.compose(systemPrompt, app) + "\n") }
     }
 
+    /** Whether [blocks] let [ref] run. A provider with no whitelist there is opencode's to judge. */
+    fun offers(blocks: Map<String, JSONObject>, ref: ModelRef): Boolean {
+        val whitelist = blocks[ref.provider]?.optJSONArray("whitelist") ?: return true
+        return (0 until whitelist.length()).any { whitelist.optString(it) == ref.modelOnly }
+    }
+
     /** Provider ids that have stored credentials in opencode's auth store. */
     fun storedCredentials(paths: RuntimePaths): Set<String> {
         val auth = File(paths.home, ".local/share/opencode/auth.json")

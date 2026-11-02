@@ -33,8 +33,10 @@ level cannot be set for it.
 - Models without tool calls (Venice's E2EE Gemma) can be picked, since a title
   request has no tools.
 - It reaches opencode at its next start, like the other options. A model whose
-  provider has no key any more (OpenCode Zen's free models need none) is left out
-  at start, so titles fall back to opencode's choice instead of failing.
+  provider has no key any more (OpenCode Zen's free models need none), or that a
+  whitelisted provider no longer offers, is left out at start, so titles fall back
+  to opencode's choice instead of failing. The setting stays, should the model
+  come back.
 
 ## Consequences
 

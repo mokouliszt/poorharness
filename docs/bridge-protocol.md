@@ -153,7 +153,7 @@ one; for `phone` chats they read the jail's folder without starting it.
 | `runtime.state` | `RuntimeState` without `backends` (keep the last ones) |
 | `backend.state` | `{backend, state}` — `stopped` is normal; `failed` means a start failed (`detail` may be an error code); opencode reports `starting` with `detail: "plugin"` while its first start downloads the Tensorlake plugin |
 | `backend.resync` | `{backend}` — the event stream reconnected; reload |
-| `models.changed`, `account.changed` | `{backend}` (`tensorlake` and `tinyfish` too) — re-read `models.list` / `accounts.get` |
+| `models.changed`, `account.changed` | `{backend}` (`tensorlake` and `tinyfish` too) — re-read `models.list` / `accounts.get`; `models.changed` follows every write of the cached list, including the one after an engine start |
 | `updates.changed` | `{result}` — an update check ran (at launch, or after an automatic update); `result` is what `updates.check` returns |
 | `key.progress` | `{provider, stage: "starting" \| "saving" \| "models"}` — during `opencode.setKey`: opencode is starting, the key (and a gateway's catalog) is being stored, the models are reloading |
 | `sessions.upsert` | `{session}` |
@@ -209,6 +209,7 @@ codes (or contain one); the UI words them (`describeError` in
 | `tensorlake_plugin_unavailable` | opencode started without its sandbox tools (see below); it is stopped again |
 | `attach_no_space` | attached files do not fit on the phone or in the chat's sandbox |
 | `attachment_missing` | a file named in `chat.send` is no longer held (the app restarted) |
+| `model_gone` | opencode does not offer the chat's model any more (retired upstream); picking another and sending again works |
 | `skill_missing` | `skills.files` / `skills.read`: the skill, or the file, is not installed |
 | `plugin_missing` | `plugins.files` / `plugins.read`: the plugin, or the file, is not installed |
 | `skill_invalid: …` | `skills.add`: the archive is not a skill skill-creator would accept; the rest says why |
@@ -403,7 +404,10 @@ reads them; opencode stores them as synthetic and its own UIs hide them.
   `message.part.delta` (`field`, `delta`), `session.status` (`busy`/`retry`/
   `idle`), `session.idle`, `session.error`, `todo.updated`, `permission.asked`
   (`id`, `sessionID`, `permission`, `patterns`, `metadata.command`),
-  `permission.replied`.
+  `permission.replied`. A model opencode does not offer fails before any request:
+  `prompt_async` still answers 204, then `session.error` comes twice as
+  `UnknownError`, its `data.message` containing `Model not found:`, the second
+  time with a stack trace (`OpencodeErrors`, `model_gone`).
 - Approvals: `POST /session/{sid}/permissions/{pid}` `{response: once | always
   | reject}`.
 - Provider keys: `PUT /auth/<provider> {type:"api", key}` or `DELETE

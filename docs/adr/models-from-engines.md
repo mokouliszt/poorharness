@@ -37,6 +37,15 @@ Settings ([engine-updates](engine-updates.md)). The wait relies on where
 opencode keeps its copy (`~/.cache/opencode/models*.json`); if that moves, the
 app simply does not wait, and a new model shows one start later.
 
+The picker can therefore be one start behind: a model retired upstream is still
+listed, and selected, until the engine starts for the message that fails on it.
+opencode then refuses it before any request leaves the phone. Every write of the
+cached list sends `models.changed`, so the picker catches up at once; a selection
+that left the list is replaced by the last choice or a default, for good, with a
+notice naming both, since the next message must not go to another model
+unannounced. The failed turn shows `model_gone`. The app does not resend it: only
+the person can say which model it should go to.
+
 The cached list is also dropped when the app version changes
 (`EngineManager.dropStaleCatalogs`): an update does not start an engine, so
 without this the picker would keep showing what the previous version stored (a

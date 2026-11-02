@@ -128,6 +128,9 @@ class OpencodeBackend(
     private val veniceModels = Venice.catalog(paths.hostPathOf(VENICE_MODELS), log = { Logs.opencode.add(it) })
     /** `provider/model` of the offered models that cannot call tools; they run as the plain [OpencodeConfig.CHAT_AGENT]. */
     @Volatile private var chatOnly: Set<String> = emptySet()
+
+    /** The `provider.<id>` blocks of the config last written. */
+    @Volatile private var offered: Map<String, JSONObject> = emptyMap()
     private val busy = ConcurrentHashMap.newKeySet<String>()
     /** Raw subagent session id -> raw parent id, learned from session.created/updated. */
     private val parents = ConcurrentHashMap<String, String>()
@@ -193,7 +196,7 @@ class OpencodeBackend(
             OpencodeConfig.write(
                 paths, settings.approval, jsPlugins, enabled, skillNames, providerBlocks(), fromPlugins, settings.systemPrompt,
                 subagentModel(), git,
-                // After providerBlocks(), which learns which offered models cannot call tools.
+                // After providerBlocks(), which learns what is offered and which of it cannot call tools.
                 chatAgent = chatOnly.isNotEmpty(),
                 titleModel = usable(settings.titleModel, "title model", "titles use the chat's model"),
             )
@@ -297,20 +300,25 @@ class OpencodeBackend(
      * models.dev's stays.
      */
     /**
-     * The model picked for subagents (or, below, for titles), when its provider can
-     * run here: Zen's free models need no key, any other provider needs its key.
-     * Otherwise they stay on the turn's model rather than fail.
+     * The model picked for subagents (or, below, for titles), when it can run here:
+     * Zen's free models need no key, any other provider needs its key, and a provider
+     * the app limits must still offer it. Otherwise they stay on the turn's model
+     * rather than fail. The setting is kept, for a model that comes back.
      */
     private fun subagentModel(): ModelRef? =
         usable(settings.subagentModel, "subagent model", "subagents use the turn's model", settings.subagentEffort)
 
-    /** A model picked in a setting ([what]), or null when its provider cannot run here ([otherwise] is logged). */
+    /** A model picked in a setting ([what]), or null when it cannot run here ([otherwise] is logged). */
     private fun usable(id: String?, what: String, otherwise: String, effort: String? = null): ModelRef? {
         id ?: return null
         val ref = ModelRef.parse(id, effort)
         if (ref.backend != ID || ref.provider.isEmpty()) return null
         if (ref.provider != "opencode" && ref.provider !in OpencodeConfig.storedCredentials(paths)) {
             Logs.opencode.add("$what ${ref.model}: no key for ${ref.provider}; $otherwise")
+            return null
+        }
+        if (!OpencodeConfig.offers(offered, ref)) {
+            Logs.opencode.add("$what ${ref.model}: no longer offered; $otherwise")
             return null
         }
         return ref
@@ -327,6 +335,7 @@ class OpencodeBackend(
             blocks[Venice.PROVIDER] = Venice.providerConfig(it)
             chatOnly = Venice.chatOnly(it)
         }
+        offered = blocks
         return blocks
     }
 
@@ -577,7 +586,7 @@ class OpencodeBackend(
                 val err = p.obj("error")
                 if (err?.str("name") == "MessageAbortedError") return
                 val message = err?.obj("data")?.str("message") ?: err?.str("name") ?: "error"
-                EventBus.emit("chat.error", jsonOf("sessionId" to Ids.session(ID, raw), "message" to message))
+                EventBus.emit("chat.error", jsonOf("sessionId" to Ids.session(ID, raw), "message" to OpencodeErrors.forChat(message)))
             }
             "session.created", "session.updated" -> {
                 val info = p.obj("info") ?: return

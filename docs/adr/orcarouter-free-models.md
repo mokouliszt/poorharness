@@ -49,7 +49,14 @@ OpenCode Zen's keyless free tier.
 ## Consequences
 
 - A free model OrcaRouter adds shows up at the next start, with no app update
-  and no wait for models.dev. One it retires disappears the same way.
+  and no wait for models.dev. One it retires disappears the same way
+  ([models-from-engines](models-from-engines.md)); it does not always leave a
+  trace: `orca/orcacyber-minimax-m3.1-flash-free` was gone by November 2026 with
+  `delisted_models` and `model_aliases` empty and its paid model still listed.
+- Being free does not mean every account may use a model: the OrcaCyber models
+  are marked `locked` with `required_tier: "sec-uncensored"` and empty
+  `enable_groups`, free ones included. The catalog cannot say what an account has
+  unlocked, so they stay offered and a refusal shows as OrcaRouter's error.
 - The router `orcarouter/free`, which picks one of the free models per request,
   is not offered: the catalog does not list it, and offering it would mean a
   model id fixed in the app.

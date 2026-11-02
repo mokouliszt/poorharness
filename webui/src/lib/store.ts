@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { call, onEvent } from "./bridge";
+import { resolveLang, translate } from "./i18n";
 import type {
   Accounts,
   AppInfo,
@@ -372,8 +373,9 @@ export async function refreshAll() {
 export async function refreshModels() {
   try {
     const res = await call<Listed<ModelInfo>>("models.list");
+    const known = get().models;
     set({ models: res.items, modelErrors: res.errors, modelsPending: res.pending ?? [] });
-    reconcileSelection();
+    reconcileSelection(known);
   } catch (e) {
     toast((e as Error).message, "error");
   }
@@ -404,8 +406,12 @@ function sortSessions(list: SessionInfo[]) {
   return [...list].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
 }
 
-/** Picks the model to use without hardcoding any: last choice, else the engines' defaults. */
-function reconcileSelection() {
+/**
+ * Picks the model to use without hardcoding any: last choice, else the engines' defaults.
+ * A choice that left the list (retired upstream, its key removed) is replaced for good,
+ * with a notice: the next message must not go to another model unannounced.
+ */
+function reconcileSelection(known: ModelInfo[]) {
   const s = get();
   const usable = s.models.filter((m) => m.available);
   const pick = (id: string | null) => usable.find((m) => m.id === id);
@@ -421,7 +427,14 @@ function reconcileSelection() {
   }
   const keepEffort = chosen.id === s.model ? s.effort : s.settings?.lastEffort ?? null;
   const effort = keepEffort && chosen.efforts.includes(keepEffort) ? keepEffort : chosen.defaultEffort;
-  set({ model: chosen.id, effort });
+  const wanted = s.model ?? s.settings?.lastModel ?? null;
+  if (wanted && wanted !== chosen.id) {
+    chooseModel(chosen.id, effort);
+    const from = known.find((m) => m.id === wanted)?.name ?? wanted.split("/").pop() ?? wanted;
+    toast(translate(resolveLang(s.settings?.language), "models.gone", { from, to: chosen.name }));
+  } else {
+    set({ model: chosen.id, effort });
+  }
 }
 
 export function chooseModel(id: string, effort: string | null) {
