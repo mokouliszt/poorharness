@@ -30,9 +30,11 @@ import dev.mokouliszt.poordsh.settings.Settings
 import dev.mokouliszt.poordsh.skills.SkillPackage
 import dev.mokouliszt.poordsh.skills.InstalledFiles
 import dev.mokouliszt.poordsh.storage.S3Storage
-import dev.mokouliszt.poordsh.tensorlake.SandboxManager
+import dev.mokouliszt.poordsh.sandbox.CloudSandboxes
 import dev.mokouliszt.poordsh.tensorlake.SandboxManager.Companion.WORKSPACE
 import dev.mokouliszt.poordsh.tensorlake.TensorlakeApi
+import dev.mokouliszt.poordsh.upstash.BoxApi
+import dev.mokouliszt.poordsh.upstash.BoxSandboxes
 import dev.mokouliszt.poordsh.web.TinyFish
 import java.io.File
 import java.io.IOException
@@ -227,6 +229,7 @@ class WebBridge(
                 )
             },
             "tensorlake" to jsonOf("keySet" to graph.secrets.has(SecretStore.TENSORLAKE_API_KEY)),
+            "box" to jsonOf("keySet" to graph.secrets.has(SecretStore.UPSTASH_BOX_API_KEY)),
             "tinyfish" to jsonOf("keySet" to graph.secrets.has(SecretStore.TINYFISH_API_KEY)),
         )
         // provider: one of OpencodeConfig.KEY_PROVIDERS ("opencode" is the OpenCode Zen key).
@@ -276,6 +279,29 @@ class WebBridge(
             null
         }
 
+        "box.set" -> {
+            val key = p.str("key")?.trim()?.takeIf { it.isNotEmpty() }
+            if (key != null) {
+                // Checked before it is kept, like the Tensorlake key.
+                try {
+                    BoxApi({ key }).list(BoxSandboxes.LABEL)
+                } catch (e: BoxApi.AuthException) {
+                    throw IOException("box_key_invalid")
+                }
+            }
+            // The app reads the key at each call (opencode never sees it): nothing to restart.
+            graph.secrets.put(SecretStore.UPSTASH_BOX_API_KEY, key)
+            EventBus.emit("account.changed", jsonOf("backend" to "box"))
+            null
+        }
+        // This month's CPU in Upstash Box, against the free plan's allowance (docs/adr/box-first.md).
+        "box.usage" -> {
+            if (!graph.hasBoxKey()) null
+            else graph.boxes.usage(refresh = p.optBoolean("refresh")).let {
+                jsonOf("month" to it.month, "usedHours" to it.usedHours, "freeHours" to it.freeHours, "spent" to it.spent)
+            }
+        }
+
         "tinyfish.set" -> {
             val key = p.str("key")?.trim()?.takeIf { it.isNotEmpty() }
             if (key != null) {
@@ -307,16 +333,13 @@ class WebBridge(
                     jsonOf("path" to path, "entries" to entries)
                 }
             } else {
-                val box = SandboxManager.nameFor(chatId)
-                // A chat that never ran, or whose sandbox Tensorlake has deleted (7 days): nothing to wake.
-                if (!graph.hasTensorlakeKey() || !graph.sandboxes.exists(box)) {
+                val place = graph.chats.placeOf(chatId)
+                val cloud = graph.chats.cloudOf(place)!!
+                // A chat that never ran, or whose sandbox is gone (Tensorlake deletes after 7 days): nothing to wake.
+                if (!graph.chats.hasKeyFor(place) || !cloud.exists(chatId)) {
                     jsonOf("path" to path, "entries" to JSONArray(), "missing" to true)
-                } else graph.sandboxes.use(box, "files") { ready ->
-                    val entries = try {
-                        graph.tensorlake.listDir(ready.sandbox, path)
-                    } catch (e: TensorlakeApi.ApiException) {
-                        if (e.code == 404) emptyList() else throw e
-                    }
+                } else cloud.use(chatId, "files") { ready ->
+                    val entries = ready.sandbox.listDir(path)
                     jsonOf(
                         "path" to path,
                         "entries" to entries.sortedWith(compareBy({ !it.isDir }, { it.name.lowercase() })).map {
@@ -334,7 +357,7 @@ class WebBridge(
                 if (!f.isFile) throw IOException("file_missing")
                 deliver(f.name, f.inputStream(), p.optString("action", "save"))
             } else withSandbox(chatId) { ready ->
-                val input = graph.tensorlake.read(ready.sandbox, path) ?: throw IOException("file_missing")
+                val input = ready.sandbox.read(path) ?: throw IOException("file_missing")
                 deliver(path.substringAfterLast('/'), input, p.optString("action", "save"))
             }
         }
@@ -346,9 +369,9 @@ class WebBridge(
                 deliver(zipName(chatId), phoneZip(root), p.optString("action", "save"))
             } else withSandbox(chatId) { ready ->
                 val zip = "/tmp/poordsh-export.zip"
-                val r = graph.tensorlake.run(ready.sandbox, "python3", listOf("-c", ZIP, WORKSPACE, zip), timeoutSecs = 300)
+                val r = ready.sandbox.run("python3", listOf("-c", ZIP, WORKSPACE, zip), timeoutSecs = 300)
                 if (r.exitCode != 0) throw IOException("could not pack the files: ${r.stderr.trim().takeLast(200)}")
-                val input = graph.tensorlake.read(ready.sandbox, zip) ?: throw IOException("file_missing")
+                val input = ready.sandbox.read(zip) ?: throw IOException("file_missing")
                 deliver(zipName(chatId), input, p.optString("action", "save"))
             }
         }
@@ -588,11 +611,11 @@ class WebBridge(
         return out.inputStream()
     }
 
-    /** The chat's sandbox, woken if needed; never created just to read files. */
-    private suspend fun <T> withSandbox(chatId: String, block: suspend (SandboxManager.Ready) -> T): T {
-        val box = SandboxManager.nameFor(chatId)
-        if (!graph.sandboxes.exists(box)) throw IOException("sandbox_missing")
-        return graph.sandboxes.use(box, "files", block)
+    /** The chat's cloud sandbox, woken (or restored) if needed; never created just to read files. */
+    private suspend fun <T> withSandbox(chatId: String, block: suspend (CloudSandboxes.Ready) -> T): T {
+        val cloud = graph.chats.cloudOf(graph.chats.placeOf(chatId)) ?: throw IOException("sandbox_missing")
+        if (!cloud.exists(chatId)) throw IOException("sandbox_missing")
+        return cloud.use(chatId, "files", block)
     }
 
     /** Paths the UI may ask for: inside the chat's workspace only. */

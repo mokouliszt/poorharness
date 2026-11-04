@@ -4,17 +4,22 @@
 
 A coding agent you drive from your Android phone. PoorHarness runs the official
 [opencode](https://github.com/anomalyco/opencode) behind a chat interface, and
-each chat works in a sandbox of its own: a [Tensorlake](https://www.tensorlake.ai)
-cloud sandbox if you add a key, otherwise a confined folder on the phone (a
-PRoot jail). Every model and provider in a chat uses the same sandbox, so you
+each chat works in a sandbox of its own: an [Upstash Box](https://upstash.com/box)
+or [Tensorlake](https://www.tensorlake.ai) cloud sandbox if you add a key,
+otherwise a confined folder on the phone (a PRoot jail). Every model and provider in a chat uses the same sandbox, so you
 can switch mid-chat and keep the files.  
 *Note: The name “PoorDSH” appears in some places as a remnant of the fact that this was originally based on DeepSeekHarness, but there are no issues with its functionality.
 
 There is no server of your own to run or pay for, and nothing is required to
 start. Optional:
 
-- **A Tensorlake API key** moves new chats into cloud sandboxes. The free plan
-  works: one sandbox at a time, 1 vCPU, 1 GB of memory and 10 GB of disk.
+- **An Upstash Box API key** moves new chats into cloud boxes. The free plan
+  works: up to 10 boxes, each with 2 vCPU, 4 GB of memory and 10 GB of disk,
+  and 5 hours of CPU a month (CPU actually used; a box waiting for the model
+  uses almost none).
+- **A Tensorlake API key** takes new chats when there is no Upstash key or
+  Box's free CPU for the month is used up. Its free plan runs one sandbox at a
+  time, with 1 vCPU, 1 GB of memory and 10 GB of disk.
 - **For models, any of these:**
   - nothing: opencode uses OpenCode Zen's free models without an account;
   - an OpenCode Zen key, for paid models and higher limits;
@@ -42,25 +47,32 @@ start. Optional:
 ## How it works
 
 ```
- Phone                                       Tensorlake (with a key)
+ Phone                                       Upstash Box, else Tensorlake
+ +------------------------------------+      (with a key)
+ | WebView UI -- Kotlin host          |      +-----------------------------+
+ |               |- PRoot: Ubuntu     |      | one sandbox per chat        |
+ |               |   `- opencode -----+----->| /tmp/workspace              |
+ |               `- without a key:    |      | commands, files, search     |
+ |                  a PRoot jail per  |      +-----------------------------+
+ |                  chat, with its    |
+ |                  /tmp/workspace    |      S3-compatible bucket (optional)
+ |                  and opencode's    |      +-----------------------------+
+ |                  tools             |      | outputs/   git/             |
  +------------------------------------+      +-----------------------------+
- | WebView UI -- Kotlin host          |      | one sandbox per chat        |
- |               |- PRoot: Ubuntu     |      | /tmp/workspace              |
- |               |   `- opencode -----+----->| commands, files, search     |
- |               `- without a key:    |      +-----------------------------+
- |                  a PRoot jail per  |
- |                  chat, with its    |      S3-compatible bucket (optional)
- |                  /tmp/workspace    |      +-----------------------------+
- |                  and opencode's    |      | outputs/   git/             |
- |                  tools             |      +-----------------------------+
- +------------------------------------+
 ```
 
-- A chat's sandbox is chosen with its first message: Tensorlake if a key is
-  set, otherwise a jail on the phone. It does not change after that, even when
-  you switch models.
-- A Tensorlake sandbox is paused a minute after it was last used and deleted
-  with the chat. A jail on the phone has its own home, temp and work folders in
+- A chat's sandbox is chosen with its first message: Upstash Box if a key is
+  set and the month's free CPU is not nearly used up, then Tensorlake if a key
+  is set, otherwise a jail on the phone. It does not change after that, even
+  when you switch models; the one exception is a Box chat that hits Box's usage
+  limit, which moves to Tensorlake (or the phone), taking its files when Box
+  still lets them be read.
+- A box or a Tensorlake sandbox is paused a minute after it was last used and
+  deleted with the chat. Box's free plan allows 10 boxes, paused ones included:
+  for an 11th chat, the box used longest ago is saved as a snapshot and deleted,
+  and comes back from the snapshot when its chat is used again (about a minute
+  the first time). The Box key stays in the app; opencode reaches boxes only
+  through it. A jail on the phone has its own home, temp and work folders in
   a copy of the app's Ubuntu, without the app's sign-ins or the phone's
   storage. Its programs are stopped a minute after it was last used (the files
   stay), and its folder is deleted with the chat.
@@ -69,7 +81,8 @@ start. Optional:
   address. Every tool it has that reads files or runs commands runs in the
   chat's sandbox through the official
   [tensorlake-opencode](https://github.com/tensorlakeai/opencode-tensorlake-plugin)
-  plugin, which PoorHarness routes to the jail when there is no key. If those tools
+  plugin, which PoorHarness routes to the box or the jail when the chat is
+  there. If those tools
   cannot be loaded, opencode does not run anything.
 - Web pages and searches are fetched from the chat's sandbox, not from the phone
   (the sandbox needs python3). If the search service reports a usage limit, an
@@ -145,6 +158,12 @@ start. Optional:
 - On Tensorlake's free plan only one cloud chat works at a time; starting
   another pauses sandboxes that are idle, and waits if the other chat is still
   working.
+- **Programs in a box stop when it pauses**, a minute after the turn ends (the
+  files stay). If the app is killed or the phone goes offline, the box ends
+  them itself after 10 minutes, and the app pauses the box when it starts
+  again. Heavy builds count against Box's 5 CPU hours a month; Settings
+  shows how much is used. Boxes run in AWS us-east-1, so pages the agent fetches
+  come from there.
 - Anonymous free models are rate-limited per IP address. On mobile networks
   that share addresses, adding a Zen key helps. Free models and their
   availability are set by OpenCode and can change.
@@ -184,7 +203,8 @@ For UI work without a phone:
 cd webui && npm install && npm run dev
 ```
 
-A mock host stands in for the app (`?setup` shows first run, `?nokey` without
+A mock host stands in for the app (`?setup` shows first run, `?box` with an
+Upstash Box key, `?boxspent` with Box's free CPU used up, `?nokey` without
 a Tensorlake key, `?nim` with an NVIDIA NIM key, `?orca` with an OrcaRouter
 key, `?infron` with an Infron key, `?venice` with a Venice key, `?nos3` without a bucket, `?prompt` with a
 system prompt, `?submodel` with a model for subagents, `?titlemodel` with a model for chat titles, `?ask` with questions
@@ -196,7 +216,7 @@ fit).
 
 | Path | Contents |
 |---|---|
-| `android/` | Kotlin host: runtime installer, PRoot launcher, opencode client, Tensorlake client, device jails, bucket and git storage, WebView bridge |
+| `android/` | Kotlin host: runtime installer, PRoot launcher, opencode client, Upstash Box and Tensorlake clients, device jails, bucket and git storage, WebView bridge |
 | `webui/` | React UI |
 | `runtime/` | recipes for PRoot and the Ubuntu image, pinned versions and checksums |
 | `tools/` | build script, icon generator |

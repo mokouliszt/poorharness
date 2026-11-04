@@ -15,15 +15,16 @@ import java.util.concurrent.Executors
 import kotlin.concurrent.thread
 
 /**
- * A loopback bridge from opencode (which runs in its own PRoot on the phone) to a
- * chat's on-device jail. opencode's PoorHarness plugin, when a chat has no Tensorlake
- * sandbox, routes the official plugin's file and command operations here instead
- * of to Tensorlake; this server runs them in the chat's jail through
- * [PhoneOps] (the [PhoneSandboxManager] in the app).
+ * A loopback bridge from opencode (which runs in its own PRoot on the phone) to
+ * the chat sandboxes the app serves itself: on-device jails and Upstash boxes.
+ * opencode's PoorHarness plugin routes the official plugin's file and command
+ * operations for a "phone:<chat>" or "box:<chat>" sandbox here instead of to
+ * Tensorlake; this server runs them through that place's [PhoneOps] (the
+ * [PhoneSandboxManager], or [box] for Upstash, whose key stays in the app).
  *
  * Loopback is shared by every app on the device, so each launch gets a random
  * bearer token (as opencode's own server does); requests without it are refused.
- * Only `127.0.0.1` is bound and only these operations are served: the four jail
+ * Only `127.0.0.1` is bound and only these operations are served: the four sandbox
  * operations, `/repo`, the plugin's repo tool for any chat ([repos]), and `/web`,
  * its webfetch and websearch fallback ([web]).
  */
@@ -46,6 +47,9 @@ class PhoneSandboxServer(
      * here so the TinyFish key stays in the app.
      */
     @Volatile var web: ((kind: String, request: JSONObject) -> String)? = null
+
+    /** The operations for "box:<chat>" sandboxes (docs/adr/box-first.md); null when Upstash Box is not wired. */
+    @Volatile var box: PhoneOps? = null
 
     private var server: ServerSocket? = null
     private var endpoint: Endpoint? = null
@@ -109,9 +113,12 @@ class PhoneSandboxServer(
             val handler = web ?: throw IOException("web fallback is not available")
             return JSONObject().put("text", handler(body.optString("kind"), body))
         }
-        val chat = body.optString("chatId").ifBlank { throw IOException("chatId required") }
+        // "sandbox" names the place ("phone:<chat>" or "box:<chat>"); a bare chatId is a jail.
+        val sandbox = body.optString("sandbox")
+        val ops = if (sandbox.startsWith(BOX_PREFIX)) box ?: throw IOException("Upstash Box is not available") else sandboxes
+        val chat = sandbox.substringAfter(':', "").ifBlank { body.optString("chatId") }.ifBlank { throw IOException("chatId required") }
         val token = "op:" + UUID.randomUUID()
-        sandboxes.acquire(chat, token)
+        ops.acquire(chat, token)
         try {
             val op = when (request.path) {
                 "/run" -> JSONObject().put("op", "run").put("command", body.optString("command"))
@@ -123,9 +130,9 @@ class PhoneSandboxServer(
                 "/list" -> JSONObject().put("op", "list").put("path", body.optString("path"))
                 else -> throw IOException("unknown path ${request.path}")
             }
-            return runBlocking { sandboxes.op(chat, op) }
+            return runBlocking { ops.op(chat, op) }
         } finally {
-            sandboxes.release(chat, token)
+            ops.release(chat, token)
         }
     }
 
@@ -188,6 +195,8 @@ class PhoneSandboxServer(
     }
 
     companion object {
+        const val BOX_PREFIX = "box:"
+
         private fun randomHex(bytes: Int): String {
             val b = ByteArray(bytes)
             SecureRandom().nextBytes(b)

@@ -72,18 +72,22 @@ interface AgentBackend {
 }
 
 /**
- * Where a chat's work runs. Decided on the chat's first message and kept for its
- * life: with a Tensorlake key, [CLOUD] (a Tensorlake sandbox); without one,
- * [PHONE] (a per-chat PRoot jail on the device). Every provider in a chat shares
- * its one place, so switching model mid-chat keeps the files.
+ * Where a chat's work runs, decided on the chat's first message
+ * (docs/adr/box-first.md): [BOX] (an Upstash box) with an Upstash key and free
+ * CPU left this month, else [CLOUD] (a Tensorlake sandbox) with a Tensorlake key,
+ * else [PHONE] (a per-chat PRoot jail on the device). It is kept for the chat's
+ * life, except that a [BOX] chat Box refuses for usage moves to the next place
+ * once. Every provider in a chat shares its one place, so switching model
+ * mid-chat keeps the files.
  */
 enum class Place {
-    CLOUD, PHONE;
+    CLOUD, PHONE, BOX;
 
     val id get() = name.lowercase()
 
     companion object {
-        fun of(id: String?) = if (id == PHONE.id) PHONE else CLOUD
+        /** Chats from before 0.19 with no place recorded ran in Tensorlake. */
+        fun of(id: String?) = entries.firstOrNull { it.id == id } ?: CLOUD
     }
 }
 

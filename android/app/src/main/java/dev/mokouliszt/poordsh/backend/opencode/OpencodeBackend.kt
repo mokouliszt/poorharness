@@ -178,9 +178,10 @@ class OpencodeBackend(
         val enabled = options()
         val git = gitRepos()
         gitOffered = git
-        // With a key, chats use Tensorlake sandboxes; without one, device jails. A
-        // placeholder key keeps the sandbox tools from refusing on the "no credentials"
-        // path, since a phone chat's tools are routed to the device, not to Tensorlake.
+        // Chats use Upstash boxes, Tensorlake sandboxes or device jails. Without a
+        // Tensorlake key, a placeholder keeps the sandbox tools from refusing on the
+        // "no credentials" path, since box and phone chats' tools are routed through
+        // the app's bridge, not to Tensorlake.
         val tensorlakeKey = secrets.get(SecretStore.TENSORLAKE_API_KEY)
         val bridge = phone.ensureStarted()
         val plugin = tensorlakePluginVersion()?.let { "tensorlake-opencode@$it" }
@@ -816,11 +817,15 @@ class OpencodeBackend(
 
     /**
      * tensorlake-opencode names a session's sandbox itself; the mapping plugin turns
-     * that into the chat's: a Tensorlake sandbox in the cloud, or "phone:<chat>" for
-     * a device jail that PoorHarness's bridge serves.
+     * that into the chat's: a Tensorlake sandbox in the cloud, or "phone:<chat>" /
+     * "box:<chat>" for a device jail or an Upstash box that PoorHarness's bridge serves.
      */
     override suspend fun bindSandbox(sessionId: String, chatId: String, place: Place) = withContext(Dispatchers.IO) {
-        val value = if (place == Place.PHONE) "phone:$chatId" else SandboxManager.nameFor(chatId)
+        val value = when (place) {
+            Place.PHONE -> "phone:$chatId"
+            Place.BOX -> "box:$chatId"
+            Place.CLOUD -> SandboxManager.nameFor(chatId)
+        }
         editMap { it.put(SandboxManager.pluginName(Ids.split(sessionId).second), value) }
     }
 
@@ -1022,7 +1027,7 @@ class OpencodeBackend(
     companion object {
         const val ID = "opencode"
         // Lets tensorlake-opencode's "no credentials" guard pass when a chat's tools are
-        // served by the device bridge instead of Tensorlake; it is never sent anywhere.
+        // served by the app's bridge (a jail or a box) instead of Tensorlake; it is never sent anywhere.
         private const val PHONE_KEY_PLACEHOLDER = "poordsh-phone"
         private val JSON = "application/json".toMediaType()
 

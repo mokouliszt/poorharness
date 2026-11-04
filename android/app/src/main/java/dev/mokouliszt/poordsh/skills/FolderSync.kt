@@ -1,7 +1,7 @@
 package dev.mokouliszt.poordsh.skills
 
 import dev.mokouliszt.poordsh.runtime.Proot
-import dev.mokouliszt.poordsh.tensorlake.TensorlakeApi
+import dev.mokouliszt.poordsh.sandbox.RemoteSandbox
 import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
@@ -28,7 +28,7 @@ class FolderSync(val root: String) {
         }
     }
 
-    /** Where a sync writes: a Tensorlake sandbox or a device jail. Paths are relative to [root]. */
+    /** Where a sync writes: a cloud sandbox or a device jail. Paths are relative to [root]. */
     interface Target {
         fun readManifest(): String?
         fun removeFolders(names: Collection<String>)
@@ -86,26 +86,26 @@ class FolderSync(val root: String) {
         }
     }
 
-    /** A Tensorlake sandbox, through its file and process APIs. */
-    inner class CloudTarget(private val api: TensorlakeApi, private val sb: TensorlakeApi.Sandbox) : Target {
-        override fun readManifest(): String? = api.read(sb, "$root/$MANIFEST")?.use { it.readBytes().decodeToString() }
+    /** A cloud sandbox (Upstash Box or Tensorlake), through its file and process APIs. */
+    inner class CloudTarget(private val sb: RemoteSandbox) : Target {
+        override fun readManifest(): String? = sb.read("$root/$MANIFEST")?.use { it.readBytes().decodeToString() }
 
         override fun removeFolders(names: Collection<String>) {
             if (names.isEmpty()) return
-            val r = api.run(sb, "rm", listOf("-rf", "--") + names.map { "$root/$it" })
+            val r = sb.run("rm", listOf("-rf", "--") + names.map { "$root/$it" })
             if (r.exitCode != 0) throw java.io.IOException("could not clear old folders: ${r.stderr.trim().takeLast(200)}")
         }
 
-        override fun upload(rel: String, file: File) = api.upload(sb, "$root/$rel", file)
+        override fun upload(rel: String, file: File) = sb.upload("$root/$rel", file)
 
         override fun markExecutable(rels: Collection<String>) {
             for (chunk in rels.chunked(200)) {
-                val r = api.run(sb, "chmod", listOf("+x", "--") + chunk.map { "$root/$it" })
+                val r = sb.run("chmod", listOf("+x", "--") + chunk.map { "$root/$it" })
                 if (r.exitCode != 0) throw java.io.IOException("could not mark scripts executable: ${r.stderr.trim().takeLast(200)}")
             }
         }
 
-        override fun writeManifest(text: String) = api.write(sb, "$root/$MANIFEST", text.toByteArray())
+        override fun writeManifest(text: String) = sb.write("$root/$MANIFEST", text.toByteArray())
     }
 
     companion object {

@@ -80,6 +80,15 @@ reasons behind them are in [`docs/adr/`](adr/README.md).
     at a local server that records requests, set `agent.title.model` to one and
     chat on the other: the "Generate a title" request should reach the first.
 
+15. Re-check Upstash Box ([box-first](adr/box-first.md)): run `BoxLiveTest` with
+    `UPSTASH_BOX_API_KEY` set (a test account's key; it makes and deletes boxes
+    named `poordsh-test-*`). Compare `BoxApi` with the routes the current
+    `@upstash/box` sends (`dist/client.js`: `/v2/box`, `exec`, `files/*`,
+    `snapshots`, `from-snapshot`, `billing`), and the free plan's numbers on
+    `upstash.com/pricing/box` with `BoxSandboxes.FREE_CPU_HOURS` and the box
+    limit. If Box's answer to a spent allowance has been seen, write it into
+    `BoxApi.classify` and the ADR.
+
 ## Following skill-creator
 
 `SkillPackage` mirrors the checks in Anthropic's skill-creator

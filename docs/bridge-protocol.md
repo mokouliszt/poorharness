@@ -1,7 +1,7 @@
 # Bridge protocol
 
 How the web UI and the Kotlin host talk, how chats map onto their sandboxes
-(Tensorlake, or a jail on the device), and how opencode maps onto them. Types on the UI side:
+(Upstash Box, Tensorlake, or a jail on the device), and how opencode maps onto them. Types on the UI side:
 `webui/src/lib/types.ts`.
 
 ## Transport
@@ -24,12 +24,38 @@ engine, and the engine stops 60 s after its last turn.
 ## Sandboxes
 
 Every chat works in one sandbox, in `/tmp/workspace`, chosen on its first
-message and kept for its life (`SessionInfo.place`): with a Tensorlake key a
-Tensorlake sandbox (`cloud`), without one a PRoot jail on the device (`phone`).
-Every provider in a chat uses that one sandbox, so files stay put when a chat
-moves between models. Chats from before 0.3 are
-`cloud`. A `cloud` chat whose key was removed fails with
-`tensorlake_key_missing` until the key is back.
+message and kept for its life (`SessionInfo.place`,
+[box-first](adr/box-first.md)): an Upstash box (`box`) with an Upstash Box key
+while the month's free CPU lasts, else a Tensorlake sandbox (`cloud`) with a
+Tensorlake key, else a PRoot jail on the device (`phone`). Every provider in a
+chat uses that one sandbox, so files stay put when a chat moves between models.
+Chats from before 0.3 are `cloud`. A `cloud` or `box` chat whose key was removed
+fails with `tensorlake_key_missing` or `box_key_missing` until the key is back.
+A `box` chat that Box refuses for usage moves once to `cloud` (or `phone`).
+
+### Upstash Box (`box`)
+
+Named `poordsh-<chat id>` (`BoxSandboxes.nameFor`), labelled `poordsh`, with
+Upstash's default size (2 vCPU, 4 GB, 10 GB on the free plan). Like Tensorlake,
+nothing of the phone is visible to the agent.
+
+- Created on the chat's first message; paused 60 s after the last thing that
+  used it (pausing keeps every file and ends every process); any call wakes it.
+  Deleted with the chat, with its snapshot if it has one.
+- Boxes left awake by a killed app are paused when the app starts. In the box,
+  a watchdog ends what commands left running once the app has not been heard
+  from for 10 minutes; a held box hears from the app every 2 minutes.
+- The free plan allows 10 boxes, paused ones included. Making an 11th first
+  archives this app's least recently used idle box (snapshot, then delete;
+  stage `room`); it comes back from the snapshot on its chat's next use. With
+  nothing to archive, a new chat starts in Tensorlake or on the device and an
+  existing one fails with `box_full`. Boxes without the label
+  are never touched.
+- Commands run through `box-runner.sh` (output in files, 1 MiB per stream,
+  exit 124 past the timeout; longer than 270 s, over several calls).
+- Box refusing work for usage (the month's free CPU) sends new chats elsewhere
+  until the month changes; the refused chat moves on its next message (stage
+  `move`), with its files when Box still lets them be read.
 
 ### Tensorlake (`cloud`)
 
@@ -71,7 +97,9 @@ writable, like a container's base layer
 
 `PhoneSandboxServer`: HTTP/1.1 on `127.0.0.1:<random>`, one per app process,
 with `Authorization: Bearer <token>`; requests without it get 401. Bodies are
-JSON with `chatId`, except `/repo` and `/web`.
+JSON with `sandbox` (`phone:<chat id>` or `box:<chat id>`, which picks the jail
+agent or `BoxOps`) and `chatId`, except `/repo` and `/web`; a body with only
+`chatId` is a jail.
 
 | Path | Body | Reply |
 |---|---|---|
@@ -126,13 +154,15 @@ JSON with `chatId`, except `/repo` and `/web`.
 | `chat.abort` | `{sessionId}` | – (while the sandbox or engine is still starting, the message is dropped; the chat's opencode subagents are stopped too) |
 | `approval.reply` | `{requestId, decision: "once" \| "session" \| "deny"}` | – |
 | `question.reply` | `{requestId, answers?: string[][]}` | – (one list of labels or typed text per question, in order; without `answers` the questions are dismissed and the turn ends; [questions](adr/questions.md)) |
-| `accounts.get` | – | `{opencode: {keys, state}, tensorlake: {keySet}, tinyfish: {keySet}}` — `keys`: the providers below whose key is stored |
+| `accounts.get` | – | `{opencode: {keys, state}, box: {keySet}, tensorlake: {keySet}, tinyfish: {keySet}}` — `keys`: the providers below whose key is stored |
 | `opencode.setKey` | `{provider: "opencode" \| "nvidia" \| "orcarouter" \| "infron" \| "venice", key \| null}` | – (OpenCode Zen, NVIDIA NIM, OrcaRouter, Infron or Venice key in opencode's own store; the model list is refreshed) |
 | `options.get` | – | `{items[{id, engine, default, requires}], enabled: id[]}` (switchable engine features, `default` true for subagents; `requires` an option it does nothing without; [engine-options](adr/engine-options.md)) |
 | `options.set` | `{enabled: id[]}` | `{enabled}` (every option is stored as on or off; unknown ids dropped; applied when the engine next starts) |
 | `tinyfish.set` | `{key \| null}` | – (checked with TinyFish before it is kept: `tinyfish_key_invalid`; read at each web fallback, so nothing restarts) |
 | `tensorlake.set` | `{key \| null}` | – (checked with Tensorlake before it is kept: `tensorlake_key_invalid`) |
-| `files.list` | `{sessionId, path?}` | `{path, entries[{name, dir, size, modifiedAt}], missing?}` — folders first; `missing` when the chat has no sandbox (never ran, or Tensorlake deleted it) |
+| `box.set` | `{key \| null}` | – (checked with Upstash before it is kept: `box_key_invalid`; read at each call, never given to opencode, so nothing restarts) |
+| `box.usage` | `{refresh?}` | `{month, usedHours, freeHours, spent} \| null` (null without a key) — this UTC month's CPU in Box against the free allowance; `spent` once Box refused work for usage |
+| `files.list` | `{sessionId, path?}` | `{path, entries[{name, dir, size, modifiedAt}], missing?}` — folders first; `missing` when the chat has no sandbox (never ran, or Tensorlake deleted it); an archived box is restored to be read |
 | `files.export` | `{sessionId, path, action: "save" \| "share"}` | `{where: "downloads" \| "share", name}` — saved to `Download/PoorHarness` (Android 10+) or offered to the share sheet |
 | `files.zip` | `{sessionId, action}` | same; the whole workspace without `node_modules`, `.venv`, `venv`, `__pycache__` |
 | `settings.get` / `settings.set` | – / partial `Settings` | `Settings` (`autoUpdate`: install newer engine releases found at launch; turning it on installs them at once. `systemPrompt`: given to opencode from the next message, `system_prompt_too_long` past 20,000 characters. `subagentModel` (`"opencode:<provider>/<model>"` or null for the chat's) and `subagentEffort`: what subagents run on, from opencode's next start, [subagent-model](adr/subagent-model.md). `titleModel` (same form, or null): what writes chat titles, from opencode's next start, [title-model](adr/title-model.md)) |
@@ -153,12 +183,12 @@ one; for `phone` chats they read the jail's folder without starting it.
 | `runtime.state` | `RuntimeState` without `backends` (keep the last ones) |
 | `backend.state` | `{backend, state}` — `stopped` is normal; `failed` means a start failed (`detail` may be an error code); opencode reports `starting` with `detail: "plugin"` while its first start downloads the Tensorlake plugin |
 | `backend.resync` | `{backend}` — the event stream reconnected; reload |
-| `models.changed`, `account.changed` | `{backend}` (`tensorlake` and `tinyfish` too) — re-read `models.list` / `accounts.get`; `models.changed` follows every write of the cached list, including the one after an engine start |
+| `models.changed`, `account.changed` | `{backend}` (`box`, `tensorlake` and `tinyfish` too) — re-read `models.list` / `accounts.get`; `models.changed` follows every write of the cached list, including the one after an engine start |
 | `updates.changed` | `{result}` — an update check ran (at launch, or after an automatic update); `result` is what `updates.check` returns |
 | `key.progress` | `{provider, stage: "starting" \| "saving" \| "models"}` — during `opencode.setKey`: opencode is starting, the key (and a gateway's catalog) is being stored, the models are reloading |
 | `sessions.upsert` | `{session}` |
 | `sessions.changed` | – re-read `sessions.list` (chats imported from an engine) |
-| `chat.stage` | `{sessionId, stage: "sandbox" \| "upload" \| "outputs" \| "repos" \| null, progress?}` — what a message waits for: the sandbox, its attached files going in (`progress` 0..1); at the end of a turn, its outputs being handed over and its git repositories saved; `null` when done |
+| `chat.stage` | `{sessionId, stage: "sandbox" \| "room" \| "move" \| "upload" \| "outputs" \| "repos" \| null, progress?}` — what a message waits for: the sandbox (`room`: another chat's box being archived to make room; `move`: the files leaving Box), its attached files going in (`progress` 0..1); at the end of a turn, its outputs being handed over and its git repositories saved; `null` when done |
 | `chat.background` | `{sessionId, count}` — opencode subagents of the chat still working after its own turn ended |
 | `chat.message` | `{sessionId, message}` (parts may be empty; carries `segment`, `engine`, `segmentModel`) |
 | `chat.part` | `{sessionId, messageId, part}` (replace by part id) |
@@ -188,7 +218,7 @@ user's answers).
 `SessionInfo`: `{id, title, createdAt, updatedAt, busy, engines[], engine,
 model, effort, place}` — `engines` in the order used, `engine` the current
 segment's, `model`/`effort` those of the last message (reopening a chat selects
-them), `place` `cloud` or `phone` once the chat has run.
+them), `place` `box`, `cloud` or `phone` once the chat has run.
 Stored messages carry `segment` (engine session id), `engine` and
 `segmentModel` (the model name when the segment began).
 
@@ -202,6 +232,9 @@ codes (or contain one); the UI words them (`describeError` in
 |---|---|
 | `tensorlake_key_missing` | a `cloud` chat with no Tensorlake key (new chats then run on the device) |
 | `tensorlake_key_invalid` | Tensorlake refused the key being saved |
+| `box_key_missing` | a `box` chat with no Upstash Box key |
+| `box_key_invalid` | Upstash refused the key being saved |
+| `box_full` | Box has 10 boxes and none of this app's is idle to archive |
 | `quota_busy` | the plan's sandbox slot is taken by a chat that is working |
 | `sandbox_gone` | the sandbox was deleted while starting; sending again makes a new one |
 | `sandbox_missing` | `files.*` on a chat without a sandbox |
@@ -252,14 +285,15 @@ reads them; opencode stores them as synthetic and its own UIs hide them.
   last, so they win:
   - their sandbox lookups go through `POORDSH_SANDBOX_MAP`
     (`/root/.config/poordsh/sandboxes.json`, `"opencode-<session>"` → the chat's
-    Tensorlake sandbox name, or `"phone:<chat id>"`; written by the host for
+    Tensorlake sandbox name, `"phone:<chat id>"` or `"box:<chat id>"`; written by the host for
     every session it creates or continues); a session without an entry is
     refused;
-  - for `phone:` sandboxes, `TensorlakeClient`'s `getOrCreateSandbox`,
+  - for `phone:` and `box:` sandboxes, `TensorlakeClient`'s `getOrCreateSandbox`,
     `executeCommand`, `readFile`, `writeFile`, `listDirectory` and
     `deleteSandbox` go to the device bridge (`POORDSH_PHONE_URL`,
     `POORDSH_PHONE_TOKEN`) instead of Tensorlake (`readFileBounded` is built on
-    the first two). Without a Tensorlake key, `TENSORLAKE_API_KEY` is a
+    the first two); the app serves `box:` ones through Box's API, so the Box key
+    stays in the app. Without a Tensorlake key, `TENSORLAKE_API_KEY` is a
     placeholder so the official plugin's "no credentials" check passes; it is
     never sent anywhere;
   - `bash` asks `ctx.ask({permission:"bash"})` and edits ask `"edit"`, so the

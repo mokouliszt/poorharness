@@ -66,6 +66,26 @@ class PhoneBridgeTest {
     }
 
     @Test
+    fun boxSandboxesGoToTheBoxOperations() {
+        val seen = mutableListOf<Pair<String, String>>()
+        server.box = object : PhoneOps {
+            override fun acquire(name: String, token: String) {}
+            override fun release(name: String, token: String) {}
+            override suspend fun op(name: String, request: JSONObject): JSONObject {
+                seen += name to request.getString("op")
+                return JSONObject().put("exitCode", 0).put("stdout", "from the box").put("stderr", "")
+            }
+        }
+        val (code, r) = post("/run", JSONObject().put("sandbox", "box:c_9").put("chatId", "c_9").put("command", "true"))
+        assertEquals(200, code)
+        assertEquals("from the box", r.getString("stdout"))
+        assertEquals(listOf("c_9" to "run"), seen)
+        // A phone sandbox still reaches the jail.
+        val (_, p) = post("/run", JSONObject().put("sandbox", "phone:c_9").put("chatId", "c_9").put("command", "echo jail").put("cwd", dir.path))
+        assertEquals("jail\n", p.getString("stdout"))
+    }
+
+    @Test
     fun refusesWithoutToken() {
         assertEquals(401, post("/run", JSONObject().put("chatId", "c").put("command", "true"), token = null).first)
         assertEquals(401, post("/run", JSONObject().put("chatId", "c").put("command", "true"), token = "wrong").first)

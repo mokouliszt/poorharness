@@ -2,7 +2,7 @@ package dev.mokouliszt.poordsh.git
 
 import dev.mokouliszt.poordsh.phone.PhoneOps
 import dev.mokouliszt.poordsh.runtime.Proot
-import dev.mokouliszt.poordsh.tensorlake.TensorlakeApi
+import dev.mokouliszt.poordsh.sandbox.RemoteSandbox
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -19,17 +19,17 @@ interface SandboxShell {
     suspend fun download(path: String, local: File)
 }
 
-/** A Tensorlake sandbox, through its process and file API. */
-class CloudShell(private val api: TensorlakeApi, private val sandbox: TensorlakeApi.Sandbox) : SandboxShell {
+/** A cloud sandbox (Upstash Box or Tensorlake), through its process and file API. */
+class CloudShell(private val sandbox: RemoteSandbox) : SandboxShell {
     override suspend fun run(script: String, args: List<String>, timeoutSecs: Int): SandboxShell.Result {
-        val r = api.run(sandbox, "bash", listOf("-c", script, "repo") + args, timeoutSecs = timeoutSecs)
+        val r = sandbox.run("bash", listOf("-c", script, "repo") + args, timeoutSecs = timeoutSecs)
         return SandboxShell.Result(r.exitCode ?: -1, r.stdout, r.stderr)
     }
 
-    override suspend fun upload(local: File, path: String) = api.upload(sandbox, path, local)
+    override suspend fun upload(local: File, path: String) = sandbox.upload(path, local)
 
     override suspend fun download(path: String, local: File) {
-        val input = api.read(sandbox, path) ?: throw IOException("$path is not in the sandbox")
+        val input = sandbox.read(path) ?: throw IOException("$path is not in the sandbox")
         local.parentFile?.mkdirs()
         input.use { src -> local.outputStream().use { src.copyTo(it) } }
     }

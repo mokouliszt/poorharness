@@ -21,6 +21,7 @@ can be followed. Procedures that are not decisions are in
 - [User data outside the image](user-data.md)
 - [Secrets](secrets.md)
 - [Chats belong to the app, not to an engine](chats-belong-to-the-app.md)
+- [Upstash Box first, then Tensorlake, then the device](box-first.md)
 - [With a Tensorlake key, every chat works in its own sandbox](chat-sandboxes.md)
 - [Without a Tensorlake key, chats work in jails on the device](phone-sandboxes.md)
 - [NVIDIA NIM through opencode's own provider](nvidia-nim.md)

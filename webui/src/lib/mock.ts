@@ -3,6 +3,7 @@
 // docs/bridge-protocol.md with canned data and a fake streaming reply.
 // URL flags: ?setup (first-run unpack),
 // ?loading (opencode still reporting its models), ?nokey (no Tensorlake key: chats run on the device),
+// ?box (an Upstash Box key is set: new chats start there), ?boxspent (Box's free CPU is used up this month),
 // ?nim (an NVIDIA NIM key is set), ?orca (an OrcaRouter key is set), ?infron (an Infron key is set), ?venice (a Venice key is set), ?ratelimit (a sent message waits for a
 // provider's daily limit), ?full (picked files do not fit in the sandbox),
 // ?updated (opencode was updated in the app and a newer release is out), ?prompt (a system prompt is set), ?titlemodel (a title model is picked),
@@ -55,6 +56,10 @@ export function createMockHost(emit: Emit) {
     titleModel: flags.includes("titlemodel") ? "opencode:opencode/big-pickle" : null,
   };
   const tensorlake = { keySet: !flags.includes("nokey") };
+  const box = { keySet: flags.includes("box") || flags.includes("boxspent") };
+  const boxSpent = flags.includes("boxspent");
+  // Where a new chat starts, as the host decides it (docs/adr/box-first.md).
+  const newPlace = () => (box.keySet && !boxSpent ? "box" : tensorlake.keySet ? "cloud" : "phone");
   const tinyfish = { keySet: false };
   const keys: Record<string, boolean> = { opencode: false, nvidia: flags.includes("nim"), orcarouter: flags.includes("orca"), infron: flags.includes("infron"), venice: flags.includes("venice") };
   let enabledOptions: string[] = ["subagents", "prune"];
@@ -115,7 +120,7 @@ export function createMockHost(emit: Emit) {
     chat("c_build", "Explain the build script", now - 80 * H, now - 79 * H, [seg("opencode", "opencode:s2", "Big Pickle")], "opencode:opencode/big-pickle", null),
   ];
   // Without a key the preview's chats run on the device, as the host's would.
-  for (const c of chats) c.place = tensorlake.keySet ? "cloud" : "phone";
+  for (const c of chats) c.place = newPlace();
   const s1 = chats[0].segments[0];
   const s2 = chats[0].segments[0];
   const history: Record<string, any[]> = {
@@ -267,9 +272,10 @@ export function createMockHost(emit: Emit) {
 
   async function send(chatId: string, text: string, model: string, effort: string | null, modelName: string | null, ids: string[] = []) {
     const c = chats.find((x) => x.id === chatId)!;
-    // Fixed on the first message: a Tensorlake sandbox with a key, a device jail without.
-    if (!c.place) c.place = tensorlake.keySet ? "cloud" : "phone";
+    // Fixed on the first message: a box, a Tensorlake sandbox, or a device jail.
+    if (!c.place) c.place = newPlace();
     if (c.place === "cloud" && !tensorlake.keySet) throw new Error("tensorlake_key_missing");
+    if (c.place === "box" && !box.keySet) throw new Error("box_key_missing");
     const engine = model.split(":")[0];
     const files = ids.map((id) => picked[id]).filter(Boolean);
     if (!c.title) c.title = (text.split("\n")[0] || files[0]?.name || "").slice(0, 60);
@@ -584,6 +590,7 @@ export function createMockHost(emit: Emit) {
       case "accounts.get":
         return {
           opencode: { keys: Object.keys(keys).filter((k) => keys[k]), state: runtime.backends.opencode },
+          box,
           tensorlake,
           tinyfish,
         };
@@ -611,6 +618,15 @@ export function createMockHost(emit: Emit) {
         tensorlake.keySet = !!p.key;
         emit({ type: "account.changed", backend: "tensorlake" });
         return null;
+      case "box.set":
+        await sleep(500);
+        if (p.key === "bad") throw new Error("box_key_invalid");
+        box.keySet = !!p.key;
+        emit({ type: "account.changed", backend: "box" });
+        return null;
+      case "box.usage":
+        await sleep(300);
+        return box.keySet ? { month: "2026-11", usedHours: boxSpent ? 5 : 0.4, freeHours: 5, spent: boxSpent } : null;
       case "tinyfish.set":
         await sleep(500);
         if (p.key === "bad") throw new Error("tinyfish_key_invalid");

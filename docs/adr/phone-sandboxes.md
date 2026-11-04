@@ -1,6 +1,7 @@
 # Without a Tensorlake key, chats work in jails on the device
 
-Status: accepted (2026-10, 0.3.0; revised in 0.11.0, opencode only)
+Status: accepted (2026-10, 0.3.0; revised in 0.11.0, opencode only; in 0.19.0,
+Upstash Box comes first, [box-first](box-first.md))
 
 ## Context
 
@@ -18,8 +19,9 @@ One sandbox per chat, shared by every provider, provided by PoorHarness: a
 PRoot jail. `files/sandboxes/<chat id>/` holds the chat's `home`,
 `tmp` and `workspace`, bound as `/root`, `/tmp` and `/tmp/workspace` into a view
 of the app's Ubuntu image (`Proot.Jail`). The app's own home (opencode's data
-and keys) and the phone's storage are not in the view. A chat's place,
-`cloud` or `phone`, is fixed on its first message: Tensorlake when a key is set
+and keys) and the phone's storage are not in the view. A chat's place, `box`,
+`cloud` or `phone`, is fixed on its first message: Upstash Box when it can take
+the chat ([box-first](box-first.md)), else Tensorlake when a key is set
 ([chat-sandboxes](chat-sandboxes.md)), otherwise the jail.
 
 - opencode's tools keep tensorlake-opencode's implementations. PoorHarness's plugin

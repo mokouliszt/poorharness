@@ -28,6 +28,10 @@ import dev.mokouliszt.poordsh.skills.SkillStore
 import dev.mokouliszt.poordsh.storage.S3Storage
 import dev.mokouliszt.poordsh.tensorlake.SandboxManager
 import dev.mokouliszt.poordsh.tensorlake.TensorlakeApi
+import dev.mokouliszt.poordsh.tensorlake.TensorlakeSandboxes
+import dev.mokouliszt.poordsh.upstash.BoxApi
+import dev.mokouliszt.poordsh.upstash.BoxOps
+import dev.mokouliszt.poordsh.upstash.BoxSandboxes
 import dev.mokouliszt.poordsh.web.TinyFish
 import dev.mokouliszt.poordsh.update.BinaryUpdater
 import dev.mokouliszt.poordsh.update.EngineUpdates
@@ -63,6 +67,10 @@ class AppGraph(context: Context) {
     fun tensorlakeKey(): String? = secrets.get(SecretStore.TENSORLAKE_API_KEY)
     fun hasTensorlakeKey() = tensorlakeKey() != null
 
+    /** Upstash Box, the first place for new chats (docs/adr/box-first.md); its key stays in the app. */
+    fun boxKey(): String? = secrets.get(SecretStore.UPSTASH_BOX_API_KEY)
+    fun hasBoxKey() = boxKey() != null
+
     /** The user's S3-compatible bucket, when connected (docs/adr/s3-storage.md). */
     @Volatile private var s3Cache: Pair<String, S3Storage>? = null
 
@@ -79,6 +87,9 @@ class AppGraph(context: Context) {
     /** The webfetch/websearch fallback; its key is read at each call, so changing it needs no restart. */
     val tinyfish = TinyFish(apiKey = { secrets.get(SecretStore.TINYFISH_API_KEY) })
     val sandboxes = SandboxManager(tensorlake, Logs.tensorlake)
+    val tensorlakeSandboxes = TensorlakeSandboxes(tensorlake, sandboxes)
+    val boxApi = BoxApi(::boxKey)
+    val boxes = BoxSandboxes(boxApi, File(context.filesDir, "box-state.json"), Logs.box)
     val runtime = RuntimeManager(context, paths, installer, guestEnv, keepalive)
 
     // On-device fallback used when there is no Tensorlake key: one PRoot jail per chat.
@@ -91,6 +102,7 @@ class AppGraph(context: Context) {
                 else -> throw IOException("unknown web request $kind")
             }
         }
+        bridge.box = BoxOps(boxes, boxApi)
     }
 
     fun engineOptions(): Set<String> = settings.engineOptions
@@ -126,8 +138,8 @@ class AppGraph(context: Context) {
         log = { Logs.app.add(it) },
     )
     val chats = ChatService(
-        chatStore, engines, sandboxes, phoneSandboxes, ::hasTensorlakeKey, tensorlake, skills, plugins, outputs,
-    )
+        chatStore, engines, tensorlakeSandboxes, boxes, phoneSandboxes, ::hasTensorlakeKey, ::hasBoxKey, skills, plugins, outputs,
+    ).also { it.moveStaging = File(context.cacheDir, "box-move") }
     /** Git for agents, kept in the bucket's `git` folder (docs/adr/git-repos.md). */
     val git = GitRepos(
         bucket = { s3()?.let { GitBucket.of(it.space(S3Storage.GIT)) } },
@@ -142,7 +154,7 @@ class AppGraph(context: Context) {
         }
     }
     val attachments = AttachmentService(
-        context.contentResolver, paths.attachments, context.cacheDir, tensorlake, sandboxes, phoneSandboxes,
+        context.contentResolver, paths.attachments, context.cacheDir, chats::cloudOf, phoneSandboxes,
         placeFor = chats::placeFor, hasRun = chats::hasRun, log = Logs.app,
     ).also { chats.attachments = it }
 
@@ -164,6 +176,7 @@ class AppGraph(context: Context) {
     fun shutdown() {
         engines.stopAllNow()
         sandboxes.suspendAllNow()
+        if (hasBoxKey()) boxes.suspendAllNow()
         phoneSandboxes.stopAllNow()
         keepalive.clear()
         chats.emitUi("app.exit")

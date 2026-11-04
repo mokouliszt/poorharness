@@ -4,6 +4,7 @@ import dev.mokouliszt.poordsh.runtime.LogBuffer
 import dev.mokouliszt.poordsh.storage.S3Storage
 import dev.mokouliszt.poordsh.tensorlake.SandboxManager
 import dev.mokouliszt.poordsh.tensorlake.TensorlakeApi
+import dev.mokouliszt.poordsh.tensorlake.TensorlakeSandbox
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -36,7 +37,7 @@ class GitReposLiveTest {
         val s3 = S3Storage(config)
         val git = GitRepos(
             bucket = { GitBucket.of(s3.space(S3Storage.GIT)) },
-            shell = { chat, block -> mgr.use(boxes.getValue(chat), "t") { block(CloudShell(api, it.sandbox)) } },
+            shell = { chat, block -> mgr.use(boxes.getValue(chat), "t") { block(CloudShell(TensorlakeSandbox(api, it.sandbox))) } },
             staging = Files.createTempDirectory("git").toFile(),
             stateFile = File.createTempFile("git-chats", ".json").apply { delete() },
             log = { println(it) },

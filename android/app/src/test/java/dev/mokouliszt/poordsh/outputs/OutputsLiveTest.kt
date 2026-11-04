@@ -5,6 +5,7 @@ import dev.mokouliszt.poordsh.runtime.LogBuffer
 import dev.mokouliszt.poordsh.storage.S3Storage
 import dev.mokouliszt.poordsh.tensorlake.SandboxManager
 import dev.mokouliszt.poordsh.tensorlake.TensorlakeApi
+import dev.mokouliszt.poordsh.tensorlake.TensorlakeSandbox
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -50,7 +51,7 @@ class OutputsLiveTest {
             api.write(sb, "$dir/pics/a.txt", "A".toByteArray())
             api.write(sb, "$dir/pics/sub/b.txt", "B".toByteArray())
             api.write(sb, "$dir/.scratch", "x".toByteArray())
-            val source = CloudOutputs(api, sb)
+            val source = CloudOutputs(TensorlakeSandbox(api, sb))
 
             val first = svc.collect(chat, source)
             assertEquals(listOf("data.csv", "pics.zip", "report.md"), first.map { it.name })

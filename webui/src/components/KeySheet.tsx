@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ExternalLink, LoaderCircle } from "lucide-react";
 import { call } from "@/lib/bridge";
-import { refreshAccounts, refreshModels, setKeySheet, setKeyStage, setProviderKey, setProviderKeySheet, setTinyfishSheet, toast, useStore } from "@/lib/store";
+import { refreshAccounts, refreshModels, setBoxSheet, setKeySheet, setKeyStage, setProviderKey, setProviderKeySheet, setTinyfishSheet, toast, useStore } from "@/lib/store";
 import { describeError, useT } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import { Sheet } from "./ui/Sheet";
@@ -10,6 +10,7 @@ import { Button } from "./ui/Button";
 // Where people get keys. Kept in the UI so it owns every link it shows.
 export const ZEN_KEYS_URL = "https://opencode.ai/auth";
 export const TENSORLAKE_KEYS_URL = "https://cloud.tensorlake.ai/";
+export const UPSTASH_KEYS_URL = "https://console.upstash.com/";
 export const TINYFISH_KEYS_URL = "https://agent.tinyfish.ai/api-keys";
 export const NVIDIA_KEYS_URL = "https://build.nvidia.com/";
 export const ORCAROUTER_KEYS_URL = "https://www.orcarouter.ai/console";
@@ -107,6 +108,34 @@ export function TensorlakeKeySheet() {
           setKeyStage("models");
           await refreshAccounts();
           await refreshModels();
+        } finally {
+          setKeyStage(null);
+        }
+        toast(t("tl.saved"));
+      }}
+    />
+  );
+}
+
+/** The Upstash Box key (optional: new chats start there while its free CPU lasts), opened from Settings. */
+export function BoxKeySheet() {
+  const t = useT();
+  const open = useStore((s) => s.boxSheet);
+  return (
+    <KeySheet
+      open={open}
+      title={t("box.sheetTitle")}
+      label={t("tl.key")}
+      getUrl={UPSTASH_KEYS_URL}
+      getLabel={t("tl.get")}
+      note={t("box.sheetNote")}
+      onClose={() => setBoxSheet(false)}
+      onSave={async (key) => {
+        // The host checks the key with Upstash before keeping it.
+        setKeyStage("checking");
+        try {
+          await call("box.set", { key });
+          await refreshAccounts();
         } finally {
           setKeyStage(null);
         }

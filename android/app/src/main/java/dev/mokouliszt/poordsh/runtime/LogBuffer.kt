@@ -30,7 +30,7 @@ class LogBuffer(val source: String, private val capacity: Int = 600) {
 
     companion object {
         // Logs can be copied out of the app; keep obvious secrets out of them.
-        private val SECRET = Regex("""(tl_apiKey_|nvapi-|sk-|Bearer\s+)[A-Za-z0-9._\-]{8,}""")
+        private val SECRET = Regex("""(tl_apiKey_|nvapi-|sk-|box_|Bearer\s+)[A-Za-z0-9._\-]{8,}""")
         fun redact(s: String): String = SECRET.replace(s) { it.groupValues[1] + "…" }
     }
 }
@@ -41,5 +41,6 @@ object Logs {
     val opencode = LogBuffer("opencode")
     val app = LogBuffer("app")
     val tensorlake = LogBuffer("tensorlake")
-    val all get() = listOf(app, tensorlake, installer, opencode)
+    val box = LogBuffer("box")
+    val all get() = listOf(app, box, tensorlake, installer, opencode)
 }

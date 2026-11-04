@@ -1,6 +1,6 @@
 # opencode's tools fail closed
 
-Status: accepted (2026-10, 0.2.0; revised in 0.3.0 and 0.4.0)
+Status: accepted (2026-10, 0.2.0; revised in 0.3.0, 0.4.0 and 0.19.0)
 
 ## Context
 
@@ -15,8 +15,8 @@ opencode's config denies every tool by default and allows only the sandbox
 tools and ones that touch neither phone nor sandbox (`OpencodeConfig`).
 PoorHarness's plugin (`android/app/src/main/assets/opencode/poordsh-sandboxes.js`),
 loaded last, re-registers the official plugin's tools (routed to the chat's
-Tensorlake sandbox or, for `phone:<chat>`, to its device jail through the
-loopback bridge; with approval asks) or, if they are missing, stand-ins that refuse;
+Tensorlake sandbox or, for `phone:<chat>` and `box:<chat>`, to its device jail
+or its Upstash box through the loopback bridge; with approval asks) or, if they are missing, stand-ins that refuse;
 its `tool.execute.before` hook refuses tools it does not know. It reports to a
 status file, and `OpencodeBackend` loads the plugins right after start-up and
 stops opencode with `tensorlake_plugin_unavailable` unless the report is good

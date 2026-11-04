@@ -8,6 +8,7 @@ import {
   checkUpdates,
   loadPlugins,
   loadSkills,
+  hasBoxKey,
   hasProviderKey,
   hasTensorlakeKey,
   loadVersions,
@@ -15,6 +16,7 @@ import {
   refreshAccounts,
   setProviderKey,
   setProviderKeySheet,
+  setBoxSheet,
   setKeySheet,
   setTinyfishSheet,
   hasTinyfishKey,
@@ -31,7 +33,7 @@ import { describeError, useT } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import { fileSize } from "@/lib/format";
 import { count, partsSummary } from "@/screens/Installed";
-import type { Approval, Engine } from "@/lib/types";
+import type { Approval, BoxUsage, Engine } from "@/lib/types";
 import { TopBar } from "@/components/TopBar";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
@@ -69,6 +71,7 @@ export function SettingsScreen() {
       <div className="scroll-quiet min-h-0 flex-1 overflow-y-auto px-4 pb-10">
         {anyBusy && <p className="px-1 pt-3 text-sm text-mute">{t("settings.busyNote")}</p>}
         <Section title={t("settings.accounts")}>
+          <BoxRow />
           <TensorlakeRow />
           <ProviderKeyRow provider="opencode" />
           <ProviderKeyRow provider="nvidia" />
@@ -480,14 +483,63 @@ function TinyFishRow() {
   );
 }
 
+/** Upstash Box: new chats start here while the month's free CPU lasts; the line shows how much is used. */
+function BoxRow() {
+  const t = useT();
+  const keySet = useStore(hasBoxKey);
+  const [usage, setUsage] = useState<BoxUsage | null>(null);
+  useEffect(() => {
+    if (!keySet) {
+      setUsage(null);
+      return;
+    }
+    call<BoxUsage | null>("box.usage")
+      .then(setUsage)
+      .catch(() => setUsage(null));
+  }, [keySet]);
+  const hours = (n: number) => (Math.round(n * 10) / 10).toString();
+  const line = !keySet
+    ? t("box.none")
+    : !usage
+      ? t("box.set")
+      : usage.spent
+        ? t("box.spent")
+        : t("box.usage", { used: hours(usage.usedHours), free: hours(usage.freeHours) });
+  return (
+    <Row>
+      <div className="min-w-0 flex-1">
+        <div>Upstash Box</div>
+        <div className="text-xs text-mute">{line}</div>
+      </div>
+      {keySet ? (
+        <Button
+          size="sm"
+          onClick={() =>
+            void call("box.set", { key: null })
+              .then(refreshAccounts)
+              .catch((e: Error) => toast(describeError(t, e.message), "error"))
+          }
+        >
+          {t("zen.remove")}
+        </Button>
+      ) : (
+        <Button size="sm" onClick={() => setBoxSheet(true)}>
+          {t("zen.add")}
+        </Button>
+      )}
+    </Row>
+  );
+}
+
 function TensorlakeRow() {
   const t = useT();
   const keySet = useStore(hasTensorlakeKey);
+  const boxFirst = useStore(hasBoxKey);
   return (
     <Row>
       <div className="min-w-0 flex-1">
         <div>Tensorlake</div>
-        <div className="text-xs text-mute">{keySet ? t("tl.keySet") : t("tl.required")}</div>
+        <div className="text-xs text-mute">{keySet ? t(boxFirst ? "tl.keySetBackup" : "tl.keySet") : t("tl.required")}</div>
       </div>
       <Button size="sm" onClick={() => setKeySheet(true)}>
         {keySet ? t("tl.change") : t("zen.add")}

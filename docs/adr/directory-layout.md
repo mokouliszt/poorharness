@@ -1,6 +1,6 @@
 # Directory layout follows how often things change
 
-Status: accepted (2026-10, revised in 0.3.0 and 0.4.0)
+Status: accepted (2026-10, revised in 0.3.0, 0.4.0 and 0.19.0)
 
 ## Context
 
@@ -36,8 +36,10 @@ in that engine's or service's package:
 | `chat/` | `ChatStore` (chats on disk), `ChatService` (engine events → chat events, turn copies), `Handoff` |
 | `backend/` | `AgentBackend` contract, `EventBus`, composite ids, `Place`, `EngineOptions`, `SystemPrompt` |
 | `backend/opencode/` | `opencode serve` client (HTTP + SSE, basic auth per launch); its tools live in sandboxes via `assets/opencode/poordsh-sandboxes.js` |
-| `tensorlake/` | `TensorlakeApi` (management and sandbox HTTP APIs), `SandboxManager` (one sandbox per chat: create, suspend when idle, delete) |
-| `phone/` | device jails for chats without a Tensorlake key: `PhoneSandboxManager` (one PRoot jail per chat), `PhoneAgent` and `AgentChannel` (the agent in a jail and its pipe protocol), `PhoneSandboxServer` (loopback bridge for opencode's plugin) |
+| `sandbox/` | `RemoteSandbox` (a cloud sandbox as the app reaches it: commands, files) and `CloudSandboxes` (a service's sandboxes by chat id), so the rest of the app does not depend on the service |
+| `upstash/` | `BoxApi` (Upstash Box's HTTP API), `BoxSandboxes` (one box per chat: create, pause when idle, archive to a snapshot to make room, delete; the month's CPU), `BoxRunner` (commands through `box-runner.sh` in the resources), `BoxOps` (the bridge's operations for `box:` sandboxes) |
+| `tensorlake/` | `TensorlakeApi` (management and sandbox HTTP APIs), `SandboxManager` (one sandbox per chat: create, suspend when idle, delete), `TensorlakeSandboxes` (both behind `sandbox/`'s interfaces) |
+| `phone/` | device jails for chats without a cloud place: `PhoneSandboxManager` (one PRoot jail per chat), `PhoneAgent` and `AgentChannel` (the agent in a jail and its pipe protocol), `PhoneSandboxServer` (loopback bridge for opencode's plugin, for jails and boxes) |
 | `skills/` | `SkillPackage` (checks a `.skill`/`.zip` like skill-creator), `SkillStore` (the user's skills on the phone), `FolderSync` (copies a store of folders into a chat's sandbox), `SkillSync` (where skills go) |
 | `plugins/` | `PluginPackage` (reads a plugin archive and its manifest), `PluginStore` (the user's plugins); what opencode uses of them is `OpencodePlugins` |
 | `outputs/` | `Outputs` (the outputs folder and what is handed over), `OutputService` (at the end of a turn), `OutputShelf` (kept on the phone or in the bucket), `PhoneOutputs`/`CloudOutputs` (reading a jail's or a Tensorlake sandbox's folder) |
@@ -51,7 +53,9 @@ in that engine's or service's package:
 | `service/` | foreground service and `Keepalive` (who needs it running) |
 
 Hand-written assets, such as PoorHarness's opencode plugin, are source and live in
-`android/app/src/main/assets/`.
+`android/app/src/main/assets/`; files the host's code reads itself, such as
+`box-runner.sh`, live beside their class under `android/app/src/main/resources/`,
+so build-host tests read them too.
 
 The UI keeps everything that talks to the host in `webui/src/lib/`:
 

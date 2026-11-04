@@ -22,6 +22,8 @@ const EMPTY: Message[] = [];
 
 const STAGES: Record<string, TKey> = {
   sandbox: "stage.sandbox",
+  room: "stage.room",
+  move: "stage.move",
   upload: "stage.upload",
   outputs: "stage.outputs",
   repos: "stage.repos",

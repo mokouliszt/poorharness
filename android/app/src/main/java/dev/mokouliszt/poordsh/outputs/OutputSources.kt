@@ -1,6 +1,6 @@
 package dev.mokouliszt.poordsh.outputs
 
-import dev.mokouliszt.poordsh.tensorlake.TensorlakeApi
+import dev.mokouliszt.poordsh.sandbox.RemoteSandbox
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
@@ -43,17 +43,13 @@ class PhoneOutputs(private val dir: File) : Outputs.Source {
 }
 
 /**
- * Reads a chat's outputs folder in its Tensorlake sandbox: files through the file
- * API; a folder is signed and zipped in the sandbox (python3, as the Files screen's
- * zip does) and the zip fetched.
+ * Reads a chat's outputs folder in its cloud sandbox (Upstash Box or Tensorlake):
+ * files through the file API; a folder is signed and zipped in the sandbox
+ * (python3, as the Files screen's zip does) and the zip fetched.
  */
-class CloudOutputs(private val api: TensorlakeApi, private val sb: TensorlakeApi.Sandbox) : Outputs.Source {
+class CloudOutputs(private val sb: RemoteSandbox) : Outputs.Source {
     override fun list(): List<Outputs.Entry> {
-        val entries = try {
-            api.listDir(sb, Outputs.DIR)
-        } catch (e: TensorlakeApi.ApiException) {
-            if (e.code == 404) return emptyList() else throw e
-        }
+        val entries = sb.listDir(Outputs.DIR)
         val dirs = entries.filter { it.isDir }.map { it.name }
         val sigs = if (dirs.isEmpty()) emptyMap() else folderSignatures(dirs)
         return entries.mapNotNull { e ->
@@ -64,23 +60,23 @@ class CloudOutputs(private val api: TensorlakeApi, private val sb: TensorlakeApi
 
     override fun fetch(entry: Outputs.Entry, to: File) {
         if (!entry.isDir) {
-            val input = api.read(sb, "${Outputs.DIR}/${entry.name}") ?: throw IOException("output_missing")
+            val input = sb.read("${Outputs.DIR}/${entry.name}") ?: throw IOException("output_missing")
             Outputs.copyLimited(input, to, Long.MAX_VALUE)
             return
         }
         val zip = "/tmp/poordsh-outputs/${UUID.randomUUID()}.zip"
         try {
-            val r = api.run(sb, "python3", listOf("-c", SCRIPT, "zip", "${Outputs.DIR}/${entry.name}", zip), timeoutSecs = 600)
+            val r = sb.run("python3", listOf("-c", SCRIPT, "zip", "${Outputs.DIR}/${entry.name}", zip), timeoutSecs = 600)
             if (r.exitCode != 0) throw IOException("could not zip ${entry.name}: ${r.stderr.trim().takeLast(200)}")
-            val input = api.read(sb, zip) ?: throw IOException("output_missing")
+            val input = sb.read(zip) ?: throw IOException("output_missing")
             Outputs.copyLimited(input, to, Long.MAX_VALUE)
         } finally {
-            runCatching { api.run(sb, "rm", listOf("-f", "--", zip)) }
+            runCatching { sb.run("rm", listOf("-f", "--", zip)) }
         }
     }
 
     private fun folderSignatures(names: List<String>): Map<String, String> {
-        val r = api.run(sb, "python3", listOf("-c", SCRIPT, "sig", Outputs.DIR) + names, timeoutSecs = 120)
+        val r = sb.run("python3", listOf("-c", SCRIPT, "sig", Outputs.DIR) + names, timeoutSecs = 120)
         if (r.exitCode != 0) throw IOException("could not read the outputs folder: ${r.stderr.trim().takeLast(200)}")
         return r.stdout.lines().filter { '\t' in it }.associate { it.substringBefore('\t') to "dir:" + it.substringAfter('\t') }
     }

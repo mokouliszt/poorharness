@@ -14,6 +14,8 @@ import dev.mokouliszt.poordsh.backend.SentFile
 import dev.mokouliszt.poordsh.bridge.jsonOf
 import dev.mokouliszt.poordsh.phone.PhoneSandboxManager
 import dev.mokouliszt.poordsh.runtime.LogBuffer
+import dev.mokouliszt.poordsh.sandbox.CloudSandboxes
+import dev.mokouliszt.poordsh.sandbox.RemoteSandbox
 import dev.mokouliszt.poordsh.tensorlake.SandboxManager
 import dev.mokouliszt.poordsh.tensorlake.TensorlakeApi
 import kotlinx.coroutines.Dispatchers
@@ -34,8 +36,8 @@ class AttachmentService(
     private val resolver: ContentResolver,
     private val dir: File,
     private val cacheDir: File,
-    private val api: TensorlakeApi,
-    private val sandboxes: SandboxManager,
+    /** The service holding a cloud place's sandboxes; null for the device. */
+    private val cloudOf: (Place) -> CloudSandboxes?,
     private val phoneSandboxes: PhoneSandboxManager,
     /** Where chat [chatId] (null: a chat not created yet) keeps its files. */
     private val placeFor: (chatId: String?) -> Place,
@@ -108,12 +110,12 @@ class AttachmentService(
 
     /**
      * Puts the files [ids] into chat [chatId]'s sandbox (a move on the phone, an
-     * upload to Tensorlake) and returns where each one is. [progress] gets 0..1.
+     * upload to the cloud) and returns where each one is. [progress] gets 0..1.
      */
     suspend fun deliver(
         chatId: String,
         place: Place,
-        sandbox: TensorlakeApi.Sandbox?,
+        sandbox: RemoteSandbox?,
         ids: List<String>,
         progress: (Double) -> Unit = {},
     ): List<Pair<Staged, Delivered>> = withContext(Dispatchers.IO) {
@@ -141,23 +143,19 @@ class AttachmentService(
         }
     }
 
-    private fun deliverToCloud(chatId: String, sb: TensorlakeApi.Sandbox, files: List<Staged>, progress: (Double) -> Unit) {
+    private fun deliverToCloud(chatId: String, sb: RemoteSandbox, files: List<Staged>, progress: (Double) -> Unit) {
         val total = files.sumOf { it.size }
-        api.freeBytes(sb, SandboxManager.WORKSPACE)?.let { free ->
+        sb.freeBytes(SandboxManager.WORKSPACE)?.let { free ->
             if (total > free - SANDBOX_RESERVE) throw NoSpace("sandbox", total, (free - SANDBOX_RESERVE).coerceAtLeast(0))
         }
-        val taken = try {
-            api.listDir(sb, Attachments.DIR).map { it.name }.toMutableSet()
-        } catch (e: TensorlakeApi.ApiException) {
-            if (e.code == 404) mutableSetOf() else throw e
-        }
+        val taken = sb.listDir(Attachments.DIR).map { it.name }.toMutableSet()
         var done = 0L
         for (f in files) {
             val name = Attachments.uniqueName(f.name, taken).also { taken += it }
             val path = "${Attachments.DIR}/$name"
-            api.upload(sb, path, f.file) { sent -> if (total > 0) progress((done + sent).toDouble() / total) }
+            sb.upload(path, f.file) { sent -> if (total > 0) progress((done + sent).toDouble() / total) }
             done += f.size
-            log.add("${SandboxManager.nameFor(chatId)}: uploaded $name (${f.size} bytes)")
+            log.add("$chatId: uploaded $name (${f.size} bytes)")
             f.delivered = Delivered(chatId, path, f.file)
         }
     }
@@ -207,22 +205,20 @@ class AttachmentService(
         dir.mkdirs()
         val device = StatFs(dir.path).availableBytes - DEVICE_RESERVE - pending
         if (size > device) throw NoSpace("device", size, device.coerceAtLeast(0))
-        if (placeFor(chatId) == Place.CLOUD) {
+        if (placeFor(chatId) != Place.PHONE) {
             val free = cloudFree(chatId) - SANDBOX_RESERVE - pending
             if (size > free) throw NoSpace("sandbox", size, free.coerceAtLeast(0))
         }
         log.add("attach: $name ($size bytes) fits")
     }
 
-    /** Free space in the chat's Tensorlake sandbox, or what a new one has. Wakes a paused one to ask. */
+    /** Free space in the chat's cloud sandbox, or what a new one has. Wakes a paused one to ask. */
     private suspend fun cloudFree(chatId: String?): Long {
         if (chatId == null || !hasRun(chatId)) return NEW_SANDBOX_FREE
-        val box = SandboxManager.nameFor(chatId)
-        val sb = runCatching { api.get(box) }.getOrNull()
-        if (sb == null || sb.status == "terminated") return NEW_SANDBOX_FREE
+        val cloud = cloudOf(placeFor(chatId)) ?: return NEW_SANDBOX_FREE
         return runCatching {
-            if (sb.running) api.freeBytes(sb, SandboxManager.WORKSPACE)
-            else sandboxes.use(box, "attach") { api.freeBytes(it.sandbox, SandboxManager.WORKSPACE) }
+            if (!cloud.exists(chatId)) null
+            else cloud.use(chatId, "attach") { it.sandbox.freeBytes(SandboxManager.WORKSPACE) }
         }.getOrNull() ?: NEW_SANDBOX_FREE
     }
 
@@ -232,7 +228,7 @@ class AttachmentService(
         /** Left free on the phone so the app and the jails keep working. */
         private const val DEVICE_RESERVE = 200L shl 20
         private const val SANDBOX_RESERVE = 64L shl 20
-        /** A new sandbox's free space (its disk minus the OS image), used before one exists. */
+        /** A new sandbox's free space (its disk minus the OS image), used before one exists; a small box has the same 10 GB. */
         val NEW_SANDBOX_FREE = TensorlakeApi.DISK_MB.toLong() * (1 shl 20) * 85 / 100
     }
 }

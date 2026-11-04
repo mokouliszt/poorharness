@@ -235,14 +235,25 @@ export interface ApprovalRequest {
 export interface Accounts {
   /** `keys`: the providers whose API key is stored ("opencode" is OpenCode Zen). */
   opencode: { keys: string[]; state: BackendStatus } | null;
-  /** A key puts chats in Tensorlake sandboxes; without it they run in on-device jails. */
+  /** A key puts new chats in Upstash boxes while the month's free CPU lasts (docs/adr/box-first.md). */
+  box?: { keySet: boolean };
+  /** A key puts chats in Tensorlake sandboxes when Upstash Box can't take them; without either, on-device jails. */
   tensorlake: { keySet: boolean };
   /** A key lets web search and fetch fall back to TinyFish when the usual service runs out. */
   tinyfish: { keySet: boolean };
 }
 
-/** Where a chat runs, fixed on its first message. */
-export type Place = "cloud" | "phone";
+/** Where a chat runs, fixed on its first message ("cloud" is Tensorlake). A "box" chat Box refuses for usage moves once. */
+export type Place = "box" | "cloud" | "phone";
+
+/** This month's CPU in Upstash Box (`box.usage`), against the free plan's allowance. */
+export interface BoxUsage {
+  month: string;
+  usedHours: number;
+  freeHours: number;
+  /** Box refused work for usage this month: new chats go to Tensorlake or the device. */
+  spent: boolean;
+}
 
 /** An optional engine feature shown in the options sheet, worded by `opt.<id>` in i18n. */
 export interface EngineOption {

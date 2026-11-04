@@ -22,9 +22,9 @@ export function Files({ sessionId, path }: { sessionId: string; path?: string })
   const lang = useStore((s) => resolveLang(s.settings?.language));
   // A chat that has run had a sandbox; one that never ran has nothing yet.
   const ran = useStore((s) => (s.sessions.find((x) => x.id === sessionId)?.engines.length ?? 0) > 0);
-  // Cloud sandboxes may expire after 7 days; a device jail keeps its files until the chat goes.
-  const onDevice = useStore((s) => s.sessions.find((x) => x.id === sessionId)?.place === "phone");
-  const keepNote = onDevice ? t("files.onDevice") : t("files.retention");
+  // Tensorlake may delete a sandbox after 7 days; a box or a device jail keeps its files until the chat goes.
+  const place = useStore((s) => s.sessions.find((x) => x.id === sessionId)?.place);
+  const keepNote = place === "phone" ? t("files.onDevice") : place === "box" ? t("files.box") : t("files.retention");
   const dir = path ?? root;
   const [listing, setListing] = useState<FileListing | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +85,7 @@ export function Files({ sessionId, path }: { sessionId: string; path?: string })
       </Center>
     );
   } else if (listing?.missing) {
-    body = ran && !onDevice ? (
+    body = ran && place !== "phone" ? (
       <Center>
         <p>{t("files.gone")}</p>
         <p className="text-xs">{keepNote}</p>

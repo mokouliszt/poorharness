@@ -1,5 +1,5 @@
-// PoorHarness: opencode's tools run only in the chat's sandbox (Tensorlake, or a
-// PRoot jail on the device when there is no Tensorlake key).
+// PoorHarness: opencode's tools run only in the chat's sandbox (an Upstash box,
+// a Tensorlake sandbox, or a PRoot jail on the device; docs/adr/box-first.md).
 //
 // opencode's config lists this plugin after tensorlake-opencode. It takes that
 // plugin's tools (by calling the plugin the way opencode does) and registers
@@ -40,9 +40,10 @@ const MAP = process.env.POORDSH_SANDBOX_MAP;
 const STATUS = process.env.POORDSH_STATUS;
 const LAUNCH = process.env.POORDSH_LAUNCH ?? "";
 const SPEC = process.env.POORDSH_TENSORLAKE_PLUGIN ?? ""; // e.g. tensorlake-opencode@0.3.1
-// The on-device bridge, used for chats whose sandbox is "phone:<chat id>"
-// (no Tensorlake key). The same opencode process can serve cloud and phone
-// chats at once; the sandbox id's prefix picks the route.
+// PoorHarness's loopback bridge, used for chats whose sandbox is "phone:<chat id>"
+// (a device jail) or "box:<chat id>" (an Upstash box, reached by the app so its
+// key stays there). The same opencode process serves every kind of chat at once;
+// the sandbox id's prefix picks the route.
 const PHONE_URL = process.env.POORDSH_PHONE_URL ?? "";
 const PHONE_TOKEN = process.env.POORDSH_PHONE_TOKEN ?? "";
 // Extra tools PoorHarness allows this launch: "batch" when the batch tool is on, and
@@ -83,10 +84,12 @@ const mkdirInOutputs = (command) => {
   });
 };
 
-const PHONE_PREFIX = "phone:";
-const isPhone = (id) => typeof id === "string" && id.startsWith(PHONE_PREFIX);
+// Sandboxes PoorHarness serves itself, through the bridge: "<prefix><chat id>".
+const BRIDGED = ["phone:", "box:"];
+const isBridged = (id) => typeof id === "string" && BRIDGED.some((p) => id.startsWith(p));
+const chatOf = (id) => id.slice(id.indexOf(":") + 1);
 
-/** One operation against a chat's on-device jail, through PoorHarness's loopback bridge. */
+/** One operation against a jail or a box, or one app service, through PoorHarness's loopback bridge. */
 async function phone(path, payload) {
   const res = await fetch(PHONE_URL + path, {
     method: "POST",
@@ -312,8 +315,9 @@ function packageDir() {
 /**
  * Routes the official plugin's sandbox operations to the chat's sandbox: a
  * Tensorlake sandbox named in the map, or, when the mapped value is
- * "phone:<chat>", the device jail through PoorHarness's loopback bridge. Only the
- * client methods the tools use are routed; the rest keep upstream behaviour.
+ * "phone:<chat>" or "box:<chat>", the device jail or the Upstash box through
+ * PoorHarness's loopback bridge. Only the client methods the tools use are
+ * routed; the rest keep upstream behaviour.
  */
 async function route(dir) {
   const { TensorlakeClient } = await import(pathToFileURL(path.join(dir, "dist", "tensorlake", "core", "client.js")).href);
@@ -325,8 +329,8 @@ async function route(dir) {
   proto.getOrCreateSandbox = async function (name, opts) {
     const chat = chatSandbox(name);
     if (!chat) throw new Error(`Not run: no chat sandbox is bound to ${name}.`);
-    // A device jail is managed by PoorHarness; no Tensorlake sandbox is created.
-    if (isPhone(chat)) return { sandboxId: chat, outcome: "attached" };
+    // A device jail or a box is managed by PoorHarness; no Tensorlake sandbox is created.
+    if (isBridged(chat)) return { sandboxId: chat, outcome: "attached" };
     const bound = await getOrCreate.call(this, chat, opts);
     chatSandboxIds.add(bound.sandboxId);
     return bound;
@@ -334,42 +338,42 @@ async function route(dir) {
 
   const exec = proto.executeCommand;
   proto.executeCommand = async function (id, command, workingDir = "/tmp/workspace", timeoutMs = 120000) {
-    if (!isPhone(id)) return exec.call(this, id, command, workingDir, timeoutMs);
-    const r = await phone("/run", { chatId: id.slice(PHONE_PREFIX.length), command, cwd: workingDir, timeoutMs });
+    if (!isBridged(id)) return exec.call(this, id, command, workingDir, timeoutMs);
+    const r = await phone("/run", { sandbox: id, chatId: chatOf(id), command, cwd: workingDir, timeoutMs });
     return { exitCode: r.exitCode ?? -1, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
   };
 
   const readFile = proto.readFile;
   proto.readFile = async function (id, p) {
-    if (!isPhone(id)) return readFile.call(this, id, p);
-    const r = await phone("/read", { chatId: id.slice(PHONE_PREFIX.length), path: p });
+    if (!isBridged(id)) return readFile.call(this, id, p);
+    const r = await phone("/read", { sandbox: id, chatId: chatOf(id), path: p });
     return Buffer.from(r.dataB64 ?? "", "base64");
   };
 
   const writeFile = proto.writeFile;
   proto.writeFile = async function (id, p, content) {
-    if (!isPhone(id)) return writeFile.call(this, id, p, content);
+    if (!isBridged(id)) return writeFile.call(this, id, p, content);
     const buf = Buffer.isBuffer(content) ? content : Buffer.from(content);
-    await phone("/write", { chatId: id.slice(PHONE_PREFIX.length), path: p, dataB64: buf.toString("base64") });
+    await phone("/write", { sandbox: id, chatId: chatOf(id), path: p, dataB64: buf.toString("base64") });
   };
 
   const listDirectory = proto.listDirectory;
   proto.listDirectory = async function (id, p) {
-    if (!isPhone(id)) return listDirectory.call(this, id, p);
-    const r = await phone("/list", { chatId: id.slice(PHONE_PREFIX.length), path: p });
+    if (!isBridged(id)) return listDirectory.call(this, id, p);
+    const r = await phone("/list", { sandbox: id, chatId: chatOf(id), path: p });
     return (r.entries ?? []).map((e) => ({ name: e.name, is_dir: e.is_dir, size: e.size }));
   };
 
   const del = proto.deleteSandbox;
   proto.deleteSandbox = async function (id) {
-    if (isPhone(id)) return false; // PoorHarness deletes the jail with the chat
+    if (isBridged(id)) return false; // PoorHarness deletes the jail or box with the chat
     return del.call(this, id);
   };
 
   const suspend = proto.suspendSandboxSync;
   if (typeof suspend === "function") {
     proto.suspendSandboxSync = function (id) {
-      if (!isPhone(id) && !chatSandboxIds.has(id)) return suspend.call(this, id);
+      if (!isBridged(id) && !chatSandboxIds.has(id)) return suspend.call(this, id);
     };
   }
   proto.__poordsh = true;

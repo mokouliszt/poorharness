@@ -84,6 +84,8 @@ interface State {
   titleSheet: boolean;
   /** The Tensorlake API key sheet, opened from wherever a chat needs the key. */
   keySheet: boolean;
+  /** The Upstash Box API key sheet. */
+  boxSheet: boolean;
   /** The engine options sheet. */
   optionsSheet: boolean;
   /** The API key sheet for an opencode provider, if open. */
@@ -146,6 +148,7 @@ const initial: State = {
   subagentSheet: false,
   titleSheet: false,
   keySheet: false,
+  boxSheet: false,
   optionsSheet: false,
   providerKeySheet: null,
   tinyfishSheet: false,
@@ -218,6 +221,10 @@ export function pop(): boolean {
     set({ keySheet: false });
     return true;
   }
+  if (s.boxSheet) {
+    set({ boxSheet: false });
+    return true;
+  }
   if (s.optionsSheet) {
     set({ optionsSheet: false });
     return true;
@@ -251,6 +258,13 @@ export function setKeySheet(open: boolean) {
 
 /** With a key, new chats run in Tensorlake sandboxes; without one, on the device. Unknown counts as set. */
 export const hasTensorlakeKey = (s: State) => s.accounts?.tensorlake?.keySet !== false;
+
+/** With a key, new chats start in Upstash Box while its free CPU lasts. */
+export const hasBoxKey = (s: State) => !!s.accounts?.box?.keySet;
+
+export function setBoxSheet(open: boolean) {
+  set({ boxSheet: open });
+}
 
 export const hasTinyfishKey = (s: State) => !!s.accounts?.tinyfish?.keySet;
 
