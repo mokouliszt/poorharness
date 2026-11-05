@@ -24,7 +24,8 @@ export function Files({ sessionId, path }: { sessionId: string; path?: string })
   const ran = useStore((s) => (s.sessions.find((x) => x.id === sessionId)?.engines.length ?? 0) > 0);
   // Tensorlake may delete a sandbox after 7 days; a box or a device jail keeps its files until the chat goes.
   const place = useStore((s) => s.sessions.find((x) => x.id === sessionId)?.place);
-  const keepNote = place === "phone" ? t("files.onDevice") : place === "box" ? t("files.box") : t("files.retention");
+  const keepNote =
+    place === "phone" ? t("files.onDevice") : place === "box" ? t("files.box") : place === "modal" ? t("files.modal") : t("files.retention");
   const dir = path ?? root;
   const [listing, setListing] = useState<FileListing | null>(null);
   const [error, setError] = useState<string | null>(null);

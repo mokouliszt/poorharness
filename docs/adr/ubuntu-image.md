@@ -16,6 +16,10 @@ kept. `APT::Sandbox::User "root"` stays in the image because apt cannot drop to
 `_apt` under PRoot's fake root on the device either. `POORDSH_REUSE_APT=1`
 reuses the slow apt stage between runs.
 
+The packages are listed in `runtime/versions.env` (`UBUNTU_PACKAGES`); among
+them `python3-venv`, for the venv Modal's SDK is installed into on first use
+([modal-first](modal-first.md)).
+
 ## Consequences
 
 The first image build takes about 15 minutes.

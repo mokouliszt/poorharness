@@ -15,7 +15,8 @@ import { InstalledFile, Plugin, Skill } from "@/screens/Installed";
 import { Toasts } from "@/components/Toasts";
 import { ApprovalSheet } from "@/components/ApprovalSheet";
 import { QuestionSheet } from "@/components/QuestionSheet";
-import { BoxKeySheet, ProviderKeySheet, TensorlakeKeySheet, TinyFishKeySheet } from "@/components/KeySheet";
+import { BoxKeySheet, ModalKeySheet, ProviderKeySheet, TensorlakeKeySheet, TinyFishKeySheet } from "@/components/KeySheet";
+import { ModalSheet } from "@/components/ModalSheet";
 import { S3Sheet } from "@/components/S3Sheet";
 
 export function App() {
@@ -58,6 +59,8 @@ export function App() {
       {/* Approvals for chats not on screen still need an answer. */}
       {ready && screen.name !== "chat" && <ApprovalSheet />}
       {ready && screen.name !== "chat" && <QuestionSheet />}
+      <ModalKeySheet />
+      <ModalSheet />
       <BoxKeySheet />
       <TensorlakeKeySheet />
       <ProviderKeySheet />

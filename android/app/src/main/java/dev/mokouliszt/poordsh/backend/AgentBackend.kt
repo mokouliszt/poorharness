@@ -73,15 +73,16 @@ interface AgentBackend {
 
 /**
  * Where a chat's work runs, decided on the chat's first message
- * (docs/adr/box-first.md): [BOX] (an Upstash box) with an Upstash key and free
- * CPU left this month, else [CLOUD] (a Tensorlake sandbox) with a Tensorlake key,
- * else [PHONE] (a per-chat PRoot jail on the device). It is kept for the chat's
- * life, except that a [BOX] chat Box refuses for usage moves to the next place
- * once. Every provider in a chat shares its one place, so switching model
- * mid-chat keeps the files.
+ * (docs/adr/modal-first.md, docs/adr/box-first.md): [MODAL] (a Modal sandbox)
+ * with a Modal token and budget left this month, else [BOX] (an Upstash box) with
+ * an Upstash key and free CPU left, else [CLOUD] (a Tensorlake sandbox) with a
+ * Tensorlake key, else [PHONE] (a per-chat PRoot jail on the device). It is kept
+ * for the chat's life, except that a [MODAL] or [BOX] chat its service no longer
+ * takes moves on down that list. Every provider in a chat shares its one place,
+ * so switching model mid-chat keeps the files.
  */
 enum class Place {
-    CLOUD, PHONE, BOX;
+    CLOUD, PHONE, BOX, MODAL;
 
     val id get() = name.lowercase()
 

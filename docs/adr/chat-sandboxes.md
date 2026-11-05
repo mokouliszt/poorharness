@@ -2,7 +2,8 @@
 
 Status: accepted (2026-10, 0.2.0; revised in 0.3.0: without a key, chats run in
 [device jails](phone-sandboxes.md); in 0.11.0, opencode only; in 0.19.0, new
-chats start in [Upstash Box](box-first.md) when it can take them)
+chats start in [Upstash Box](box-first.md) when it can take them; in 0.20.0, in
+[Modal](modal-first.md) before that)
 
 ## Context
 
@@ -31,8 +32,9 @@ through opencode's `permission` config, which PoorHarness's plugin asks against.
 
 ## Consequences
 
-This applies to chats whose first message was sent with a key and that Upstash
-Box did not take ([box-first](box-first.md)), and to chats moved out of Box; the
+This applies to chats whose first message was sent with a key and that neither
+Modal nor Upstash Box took ([modal-first](modal-first.md), [box-first](box-first.md)),
+and to chats moved out of them; the
 place is kept for the chat's life ([phone-sandboxes](phone-sandboxes.md)). The first
 opencode start downloads the plugin. On the free plan only one chat works at a time. A
 chat whose sandbox expired continues in a new, empty one.

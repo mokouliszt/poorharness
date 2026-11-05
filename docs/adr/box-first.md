@@ -1,4 +1,4 @@
-# Upstash Box first, then Tensorlake, then the device
+# Upstash Box before Tensorlake and the device
 
 Status: accepted (2026-11, 0.19.0)
 
@@ -42,7 +42,8 @@ observed: using up the test account's allowance on purpose was turned down.
 
 ## Decision
 
-A chat's place ([Place]) is chosen on its first message, in this order:
+A chat's place ([Place]) is chosen on its first message, in this order (Modal,
+when its token is set, comes before all of them: [modal-first](modal-first.md)):
 
 1. `box`: an Upstash Box key is set, Box has not refused work for usage this
    month, and the month's CPU is under 95% of the free allowance
@@ -66,7 +67,7 @@ So:
 - when the app starts, it pauses its boxes that are awake and unused for 3
   minutes (left by a killed app; one another phone is using stays awake);
 - every command records its session in the box, and a watchdog there (started
-  by `box-runner.sh` whenever the app checks the box) kills those sessions,
+  by the runner script whenever the app checks the box) kills those sessions,
   with whatever they left in the background, once the app has not been heard
   from for 10 minutes, as when the phone dies or goes offline. While a chat
   holds its box, the app tells the box it is there every 2 minutes, so a long
@@ -86,7 +87,7 @@ with `box_full`.
 loopback bridge, like a jail's, and the app calls Box (a box checked when the
 turn started is used without asking Box again); the Box key never reaches
 opencode, a sandbox or a model ([secrets](secrets.md)). The app runs each
-command through `box-runner.sh` (resources, next to `BoxRunner`), so replies
+command through `sandbox/runner.sh` (resources, next to `SandboxRunner`), so replies
 match the jail agent's: output into files (so `cmd &` returns), 1 MiB per
 stream, exit 124 past the timeout. A command allowed longer than 270 s runs
 apart and is waited for over calls of at most 240 s, under the gateway's 300 s.

@@ -88,6 +88,17 @@ reasons behind them are in [`docs/adr/`](adr/README.md).
     `upstash.com/pricing/box` with `BoxSandboxes.FREE_CPU_HOURS` and the box
     limit. If Box's answer to a spent allowance has been seen, write it into
     `BoxApi.classify` and the ADR.
+16. Re-check Modal ([modal-first](adr/modal-first.md)). The SDK follows Modal by
+    itself (pip, weekly), but `assets/modal/poordsh-modal.py` calls it: drive
+    the script with a test token the way `ModalAgent` does (one JSON request per
+    line, `init` first) and run each op it serves, from a machine whose network
+    carries gRPC. Check that `Workspace.billing.rates()` still names prices
+    `gpu_hour_cost_<gpu>`, `cpu_hour_cost_sandbox` and
+    `mem_gib_hour_cost_sandbox`, that each GPU's id is still the name upper-cased
+    (`ModalSandboxes.GPU_IDS` lists the exceptions), and that the Starter
+    credits still match `ModalSandboxes.DEFAULT_BUDGET_USD`. If Modal's answer to
+    a spent limit has been seen, write it into the script's `kind` and the ADR.
+    `ModalSandboxesTest` covers the rest with a stand-in.
 
 ## Following skill-creator
 

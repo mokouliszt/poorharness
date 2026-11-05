@@ -1,7 +1,20 @@
 import { useState } from "react";
 import { ExternalLink, LoaderCircle } from "lucide-react";
 import { call } from "@/lib/bridge";
-import { refreshAccounts, refreshModels, setBoxSheet, setKeySheet, setKeyStage, setProviderKey, setProviderKeySheet, setTinyfishSheet, toast, useStore } from "@/lib/store";
+import {
+  loadModalUsage,
+  refreshAccounts,
+  refreshModels,
+  setBoxSheet,
+  setKeySheet,
+  setKeyStage,
+  setModalKeySheet,
+  setProviderKey,
+  setProviderKeySheet,
+  setTinyfishSheet,
+  toast,
+  useStore,
+} from "@/lib/store";
 import { describeError, useT } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import { Sheet } from "./ui/Sheet";
@@ -11,6 +24,7 @@ import { Button } from "./ui/Button";
 export const ZEN_KEYS_URL = "https://opencode.ai/auth";
 export const TENSORLAKE_KEYS_URL = "https://cloud.tensorlake.ai/";
 export const UPSTASH_KEYS_URL = "https://console.upstash.com/";
+export const MODAL_KEYS_URL = "https://modal.com/settings";
 export const TINYFISH_KEYS_URL = "https://agent.tinyfish.ai/api-keys";
 export const NVIDIA_KEYS_URL = "https://build.nvidia.com/";
 export const ORCAROUTER_KEYS_URL = "https://www.orcarouter.ai/console";
@@ -136,6 +150,38 @@ export function BoxKeySheet() {
         try {
           await call("box.set", { key });
           await refreshAccounts();
+        } finally {
+          setKeyStage(null);
+        }
+        toast(t("tl.saved"));
+      }}
+    />
+  );
+}
+
+/**
+ * The Modal token (optional: new chats start there while the month's budget lasts),
+ * opened from Settings. The first token also installs Modal's tools in the app.
+ */
+export function ModalKeySheet() {
+  const t = useT();
+  const open = useStore((s) => s.modalKeySheet);
+  return (
+    <KeySheet
+      open={open}
+      title={t("modal.sheetTitle")}
+      label={t("modal.token")}
+      getUrl={MODAL_KEYS_URL}
+      getLabel={t("modal.get")}
+      note={t("modal.sheetNote")}
+      onClose={() => setModalKeySheet(false)}
+      onSave={async (key) => {
+        // The host checks the token with Modal before keeping it.
+        setKeyStage("checking");
+        try {
+          await call("modal.set", { key });
+          await refreshAccounts();
+          void loadModalUsage(true);
         } finally {
           setKeyStage(null);
         }

@@ -824,6 +824,7 @@ class OpencodeBackend(
         val value = when (place) {
             Place.PHONE -> "phone:$chatId"
             Place.BOX -> "box:$chatId"
+            Place.MODAL -> "modal:$chatId"
             Place.CLOUD -> SandboxManager.nameFor(chatId)
         }
         editMap { it.put(SandboxManager.pluginName(Ids.split(sessionId).second), value) }

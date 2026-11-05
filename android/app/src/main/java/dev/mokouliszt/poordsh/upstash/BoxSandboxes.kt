@@ -177,7 +177,7 @@ class BoxSandboxes(
         ids[name] = box.id
         used[name] = System.currentTimeMillis()
         // Any call wakes a paused box. This one also makes the workspace and starts the box's
-        // watchdog (box-runner.sh), and is where a spent allowance shows.
+        // watchdog (runner.sh), and is where a spent allowance shows.
         val r = BoxRunner.alive(api, box.id, folders = listOf(WORKSPACE))
         if (r.exitCode != 0) throw IOException("Upstash Box: could not prepare $name: ${r.stderr.trim().take(200)}")
         awake.add(name)

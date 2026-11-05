@@ -66,6 +66,8 @@ class SecretStore(context: Context) {
         const val TENSORLAKE_API_KEY = "tensorlake_api_key"
         /** Upstash Box, the first place for new chats (docs/adr/box-first.md); it never leaves the app. */
         const val UPSTASH_BOX_API_KEY = "upstash_box_api_key"
+        /** Modal's token, id and secret as one JSON (docs/adr/modal-first.md); it never leaves the app but for the Modal helper. */
+        const val MODAL_TOKEN = "modal_token"
         /** TinyFish, the fallback for webfetch and websearch (docs/adr/web-in-sandbox.md). */
         const val TINYFISH_API_KEY = "tinyfish_api_key"
         /** The S3-compatible bucket's settings and keys, as one JSON ([dev.mokouliszt.poordsh.storage.S3Storage.Config]). */

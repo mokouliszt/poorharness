@@ -18,5 +18,6 @@ downloads.
 ## Consequences
 
 Heavy builds are slow in a sandbox. On the free plan one chat works at a time
-([chat-sandboxes](chat-sandboxes.md)); with an Upstash Box key, Tensorlake only
-takes the chats Box cannot ([box-first](box-first.md)).
+([chat-sandboxes](chat-sandboxes.md)); with a Modal token or an Upstash Box key, Tensorlake
+only takes the chats they cannot ([modal-first](modal-first.md),
+[box-first](box-first.md)).

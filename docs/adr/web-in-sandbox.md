@@ -12,7 +12,7 @@ Exa service, which has a usage limit.
 
 PoorHarness's plugin registers `webfetch` and `websearch` last, with opencode's
 own arguments, so they replace the built-in ones. Each request runs in the
-chat's sandbox (an Upstash box, a Tensorlake sandbox or a device jail): the plugin sends
+chat's sandbox (a Modal sandbox, an Upstash box, a Tensorlake sandbox or a device jail): the plugin sends
 `assets/opencode/poordsh-web.py`, with its arguments in base64, through
 tensorlake-opencode's `bash` tool, so the sandbox is found and routed exactly as
 for the model's own commands. The script needs only python3's standard library:

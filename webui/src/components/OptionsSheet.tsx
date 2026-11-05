@@ -1,7 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronRight, SlidersHorizontal } from "lucide-react";
-import { setOption, setOptionsSheet, setSubagentSheet, setTitleSheet, toast, useStore } from "@/lib/store";
+import {
+  hasModalKey,
+  loadModalUsage,
+  setChatGpu,
+  setOption,
+  setOptionsSheet,
+  setSubagentSheet,
+  setTitleSheet,
+  toast,
+  useStore,
+} from "@/lib/store";
 import { describeError, useT, type TKey } from "@/lib/i18n";
+import { usd } from "@/lib/format";
 import { Sheet } from "./ui/Sheet";
 import { Switch } from "./ui/Switch";
 import { cn } from "@/lib/cn";
@@ -10,9 +21,10 @@ import { cn } from "@/lib/cn";
  * opencode's switchable features. The host owns the list, their defaults and how
  * each one is applied (docs/adr/engine-options.md); this only shows them and which
  * are on. Under subagents: the model they run on (docs/adr/subagent-model.md). Last,
- * the model chat titles are written with (docs/adr/title-model.md).
+ * the model chat titles are written with (docs/adr/title-model.md). Opened in a chat
+ * that works (or will start) in Modal, it first offers that chat a GPU.
  */
-export function OptionsSheet() {
+export function OptionsSheet({ sessionId }: { sessionId?: string }) {
   const t = useT();
   const open = useStore((s) => s.optionsSheet);
   const items = useStore((s) => s.options);
@@ -38,6 +50,7 @@ export function OptionsSheet() {
   return (
     <Sheet open={open} onClose={() => setOptionsSheet(false)} title={t("options.title")}>
       <div className="scroll-quiet min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+        {sessionId && <ChatGpu sessionId={sessionId} open={open} />}
         {items.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-mute">{t("options.none")}</p>
         ) : (
@@ -103,6 +116,52 @@ export function OptionsSheet() {
         {items.length > 0 && running && <p className="px-3 pt-1 text-xs text-mute">{t("options.applyLater")}</p>}
       </div>
     </Sheet>
+  );
+}
+
+/**
+ * A GPU for this chat's Modal sandbox (docs/adr/modal-first.md). Shown while the
+ * chat is in Modal, or has not started and a Modal token is set.
+ */
+function ChatGpu({ sessionId, open }: { sessionId: string; open: boolean }) {
+  const t = useT();
+  const session = useStore((s) => s.sessions.find((x) => x.id === sessionId));
+  // In Modal, or not started yet with a token set (it will start there unless Modal is near its budget).
+  const modal = useStore((s) => (session?.place ? session.place === "modal" : !session?.engines.length && hasModalKey(s)));
+  const gpu = useStore((s) => s.settings?.modalGpu ?? "T4");
+  const price = useStore((s) => s.modalUsage?.gpus.find((g) => g.id === gpu)?.usdPerHour);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (open && modal) void loadModalUsage();
+  }, [open, modal]);
+  if (!session || !modal) return null;
+  // This chat's own setting, set apart from the engine-wide options below.
+  return (
+    <div className="mb-1 border-b border-line pb-1">
+      <label className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-3 active:bg-raised">
+        <div className="min-w-0 flex-1">
+          <div className="text-base text-paper">{t("gpu.title", { gpu })}</div>
+          <div className="phrase text-xs text-mute">
+            {price != null ? t("gpu.desc", { price: usd(price) }) : t("gpu.descNoPrice")}
+          </div>
+        </div>
+        <Switch
+          checked={!!session.gpu}
+          disabled={saving}
+          label={t("gpu.title", { gpu })}
+          onCheckedChange={async (v) => {
+            setSaving(true);
+            try {
+              await setChatGpu(sessionId, v);
+            } catch (e) {
+              toast(describeError(t, (e as Error).message), "error");
+            } finally {
+              setSaving(false);
+            }
+          }}
+        />
+      </label>
+    </div>
   );
 }
 

@@ -1,5 +1,6 @@
-// PoorHarness: opencode's tools run only in the chat's sandbox (an Upstash box,
-// a Tensorlake sandbox, or a PRoot jail on the device; docs/adr/box-first.md).
+// PoorHarness: opencode's tools run only in the chat's sandbox (a Modal sandbox,
+// an Upstash box, a Tensorlake sandbox, or a PRoot jail on the device;
+// docs/adr/modal-first.md, docs/adr/box-first.md).
 //
 // opencode's config lists this plugin after tensorlake-opencode. It takes that
 // plugin's tools (by calling the plugin the way opencode does) and registers
@@ -41,8 +42,8 @@ const STATUS = process.env.POORDSH_STATUS;
 const LAUNCH = process.env.POORDSH_LAUNCH ?? "";
 const SPEC = process.env.POORDSH_TENSORLAKE_PLUGIN ?? ""; // e.g. tensorlake-opencode@0.3.1
 // PoorHarness's loopback bridge, used for chats whose sandbox is "phone:<chat id>"
-// (a device jail) or "box:<chat id>" (an Upstash box, reached by the app so its
-// key stays there). The same opencode process serves every kind of chat at once;
+// (a device jail), "box:<chat id>" (an Upstash box) or "modal:<chat id>" (a Modal
+// sandbox), the last two reached by the app so their keys stay there. The same opencode process serves every kind of chat at once;
 // the sandbox id's prefix picks the route.
 const PHONE_URL = process.env.POORDSH_PHONE_URL ?? "";
 const PHONE_TOKEN = process.env.POORDSH_PHONE_TOKEN ?? "";
@@ -85,7 +86,7 @@ const mkdirInOutputs = (command) => {
 };
 
 // Sandboxes PoorHarness serves itself, through the bridge: "<prefix><chat id>".
-const BRIDGED = ["phone:", "box:"];
+const BRIDGED = ["phone:", "box:", "modal:"];
 const isBridged = (id) => typeof id === "string" && BRIDGED.some((p) => id.startsWith(p));
 const chatOf = (id) => id.slice(id.indexOf(":") + 1);
 

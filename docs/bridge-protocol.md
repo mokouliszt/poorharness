@@ -1,7 +1,7 @@
 # Bridge protocol
 
 How the web UI and the Kotlin host talk, how chats map onto their sandboxes
-(Upstash Box, Tensorlake, or a jail on the device), and how opencode maps onto them. Types on the UI side:
+(Modal, Upstash Box, Tensorlake, or a jail on the device), and how opencode maps onto them. Types on the UI side:
 `webui/src/lib/types.ts`.
 
 ## Transport
@@ -25,13 +25,39 @@ engine, and the engine stops 60 s after its last turn.
 
 Every chat works in one sandbox, in `/tmp/workspace`, chosen on its first
 message and kept for its life (`SessionInfo.place`,
-[box-first](adr/box-first.md)): an Upstash box (`box`) with an Upstash Box key
-while the month's free CPU lasts, else a Tensorlake sandbox (`cloud`) with a
-Tensorlake key, else a PRoot jail on the device (`phone`). Every provider in a
-chat uses that one sandbox, so files stay put when a chat moves between models.
-Chats from before 0.3 are `cloud`. A `cloud` or `box` chat whose key was removed
-fails with `tensorlake_key_missing` or `box_key_missing` until the key is back.
-A `box` chat that Box refuses for usage moves once to `cloud` (or `phone`).
+[modal-first](adr/modal-first.md), [box-first](adr/box-first.md)): a Modal
+sandbox (`modal`) with a Modal token while the month's budget lasts, else an
+Upstash box (`box`) with an Upstash Box key while the month's free CPU lasts,
+else a Tensorlake sandbox (`cloud`) with a Tensorlake key, else a PRoot jail on
+the device (`phone`). Every provider in a chat uses that one sandbox, so files
+stay put when a chat moves between models. Chats from before 0.3 are `cloud`. A
+`cloud`, `box` or `modal` chat whose key was removed fails with
+`tensorlake_key_missing`, `box_key_missing` or `modal_key_missing` until the key
+is back. A `modal` chat Modal no longer takes this month moves once to the next
+place (`box`, `cloud` or `phone`); so does a `box` chat Box refuses for usage
+(to `cloud` or `phone`).
+
+### Modal (`modal`)
+
+Named `poordsh-<chat id>` (`ModalSandboxes.nameFor`) in the Modal App
+`poorharness`, tagged `poordsh`, `chat` and `gpu`. The app drives it through
+Modal's Python SDK in its own Ubuntu (`assets/modal/poordsh-modal.py`), so the
+token stays in the app.
+
+- Started on the chat's first message (a slice of a core and 256 MiB, up to 2
+  cores and 4 GiB; with the chat's GPU on, the GPU set in Settings, up to 4
+  cores and 16 GiB). Snapshotted when the chat lets go and stopped 60 s later;
+  the next use starts from the snapshot with every file. Snapshots expire after
+  30 days; the sandbox and its snapshot are deleted with the chat.
+- A held sandbox gets an empty command every 50 s, so Modal's idle stop (5
+  minutes, 2 with a GPU) ends it only once the phone is gone; a held GPU no tool
+  has used for 10 minutes is saved and stopped. Sandboxes of this phone's chats
+  left running by a killed app are saved and stopped at start.
+- New chats start here under 80% of the month's budget; from 95%, or once Modal
+  refused work for usage, a chat moves on at its next message (stage `move`),
+  with its files. A GPU needs half an hour of it left (`modal_gpu_budget`).
+- The first token installs Modal's SDK in the app (stage `tools` for a chat
+  waiting on it, `installing` in the key sheet).
 
 ### Upstash Box (`box`)
 
@@ -51,7 +77,7 @@ nothing of the phone is visible to the agent.
   nothing to archive, a new chat starts in Tensorlake or on the device and an
   existing one fails with `box_full`. Boxes without the label
   are never touched.
-- Commands run through `box-runner.sh` (output in files, 1 MiB per stream,
+- Commands run through `runner.sh` (output in files, 1 MiB per stream,
   exit 124 past the timeout; longer than 270 s, over several calls).
 - Box refusing work for usage (the month's free CPU) sends new chats elsewhere
   until the month changes; the refused chat moves on its next message (stage
@@ -154,18 +180,21 @@ agent or `BoxOps`) and `chatId`, except `/repo` and `/web`; a body with only
 | `chat.abort` | `{sessionId}` | – (while the sandbox or engine is still starting, the message is dropped; the chat's opencode subagents are stopped too) |
 | `approval.reply` | `{requestId, decision: "once" \| "session" \| "deny"}` | – |
 | `question.reply` | `{requestId, answers?: string[][]}` | – (one list of labels or typed text per question, in order; without `answers` the questions are dismissed and the turn ends; [questions](adr/questions.md)) |
-| `accounts.get` | – | `{opencode: {keys, state}, box: {keySet}, tensorlake: {keySet}, tinyfish: {keySet}}` — `keys`: the providers below whose key is stored |
+| `accounts.get` | – | `{opencode: {keys, state}, modal: {keySet}, box: {keySet}, tensorlake: {keySet}, tinyfish: {keySet}}` — `keys`: the providers below whose key is stored |
 | `opencode.setKey` | `{provider: "opencode" \| "nvidia" \| "orcarouter" \| "infron" \| "venice", key \| null}` | – (OpenCode Zen, NVIDIA NIM, OrcaRouter, Infron or Venice key in opencode's own store; the model list is refreshed) |
 | `options.get` | – | `{items[{id, engine, default, requires}], enabled: id[]}` (switchable engine features, `default` true for subagents; `requires` an option it does nothing without; [engine-options](adr/engine-options.md)) |
 | `options.set` | `{enabled: id[]}` | `{enabled}` (every option is stored as on or off; unknown ids dropped; applied when the engine next starts) |
 | `tinyfish.set` | `{key \| null}` | – (checked with TinyFish before it is kept: `tinyfish_key_invalid`; read at each web fallback, so nothing restarts) |
 | `tensorlake.set` | `{key \| null}` | – (checked with Tensorlake before it is kept: `tensorlake_key_invalid`) |
+| `modal.set` | `{key \| null}` | – (`key`: the token's ID and secret, or the `modal token set` line; `modal_key_invalid` without both or when Modal refuses it; the first token installs Modal's SDK, reported as `key.progress` `installing`) |
+| `modal.usage` | `{refresh?}` | `{month, spentUsd, budgetUsd, spent, gpus[{id, usdPerHour}]} \| null` (null without a token) — this UTC month's cost (Modal's summary or the app's own count, whichever is higher) against the budget; `gpus` from Modal's rates, cheapest first |
+| `chat.setGpu` | `{sessionId, on}` | – (the chat's Modal sandbox gets the GPU from its next message; `sessions.upsert` follows) |
 | `box.set` | `{key \| null}` | – (checked with Upstash before it is kept: `box_key_invalid`; read at each call, never given to opencode, so nothing restarts) |
 | `box.usage` | `{refresh?}` | `{month, usedHours, freeHours, spent} \| null` (null without a key) — this UTC month's CPU in Box against the free allowance; `spent` once Box refused work for usage |
 | `files.list` | `{sessionId, path?}` | `{path, entries[{name, dir, size, modifiedAt}], missing?}` — folders first; `missing` when the chat has no sandbox (never ran, or Tensorlake deleted it); an archived box is restored to be read |
 | `files.export` | `{sessionId, path, action: "save" \| "share"}` | `{where: "downloads" \| "share", name}` — saved to `Download/PoorHarness` (Android 10+) or offered to the share sheet |
 | `files.zip` | `{sessionId, action}` | same; the whole workspace without `node_modules`, `.venv`, `venv`, `__pycache__` |
-| `settings.get` / `settings.set` | – / partial `Settings` | `Settings` (`autoUpdate`: install newer engine releases found at launch; turning it on installs them at once. `systemPrompt`: given to opencode from the next message, `system_prompt_too_long` past 20,000 characters. `subagentModel` (`"opencode:<provider>/<model>"` or null for the chat's) and `subagentEffort`: what subagents run on, from opencode's next start, [subagent-model](adr/subagent-model.md). `titleModel` (same form, or null): what writes chat titles, from opencode's next start, [title-model](adr/title-model.md)) |
+| `settings.get` / `settings.set` | – / partial `Settings` | `Settings` (`autoUpdate`: install newer engine releases found at launch; turning it on installs them at once. `systemPrompt`: given to opencode from the next message, `system_prompt_too_long` past 20,000 characters. `subagentModel` (`"opencode:<provider>/<model>"` or null for the chat's) and `subagentEffort`: what subagents run on, from opencode's next start, [subagent-model](adr/subagent-model.md). `titleModel` (same form, or null): what writes chat titles, from opencode's next start, [title-model](adr/title-model.md). `modalBudgetUsd`: the month's budget for Modal, above 0 (`modal_budget_invalid`); changing it clears a usage refusal recorded this month. `modalGpu`: the GPU id chats that turn one on get) |
 | `updates.check` | – | `{opencode: ToolUpdateInfo}` |
 | `updates.last` | – | the check run when the app opened, same shape, or `null` if none ran yet |
 | `updates.apply` / `updates.reset` | `{tool}` | `{version}` / – |
@@ -183,12 +212,12 @@ one; for `phone` chats they read the jail's folder without starting it.
 | `runtime.state` | `RuntimeState` without `backends` (keep the last ones) |
 | `backend.state` | `{backend, state}` — `stopped` is normal; `failed` means a start failed (`detail` may be an error code); opencode reports `starting` with `detail: "plugin"` while its first start downloads the Tensorlake plugin |
 | `backend.resync` | `{backend}` — the event stream reconnected; reload |
-| `models.changed`, `account.changed` | `{backend}` (`box`, `tensorlake` and `tinyfish` too) — re-read `models.list` / `accounts.get`; `models.changed` follows every write of the cached list, including the one after an engine start |
+| `models.changed`, `account.changed` | `{backend}` (`modal`, `box`, `tensorlake` and `tinyfish` too) — re-read `models.list` / `accounts.get`; `models.changed` follows every write of the cached list, including the one after an engine start |
 | `updates.changed` | `{result}` — an update check ran (at launch, or after an automatic update); `result` is what `updates.check` returns |
-| `key.progress` | `{provider, stage: "starting" \| "saving" \| "models"}` — during `opencode.setKey`: opencode is starting, the key (and a gateway's catalog) is being stored, the models are reloading |
+| `key.progress` | `{provider, stage: "starting" \| "saving" \| "models" \| "installing"}` — during `opencode.setKey`: opencode is starting, the key (and a gateway's catalog) is being stored, the models are reloading; during `modal.set`: Modal's SDK is being installed |
 | `sessions.upsert` | `{session}` |
 | `sessions.changed` | – re-read `sessions.list` (chats imported from an engine) |
-| `chat.stage` | `{sessionId, stage: "sandbox" \| "room" \| "move" \| "upload" \| "outputs" \| "repos" \| null, progress?}` — what a message waits for: the sandbox (`room`: another chat's box being archived to make room; `move`: the files leaving Box), its attached files going in (`progress` 0..1); at the end of a turn, its outputs being handed over and its git repositories saved; `null` when done |
+| `chat.stage` | `{sessionId, stage: "sandbox" \| "tools" \| "room" \| "move" \| "upload" \| "outputs" \| "repos" \| null, progress?}` — what a message waits for: the sandbox (`tools`: Modal's SDK being installed; `room`: another chat's box being archived to make room; `move`: the files leaving Modal or Box), its attached files going in (`progress` 0..1); at the end of a turn, its outputs being handed over and its git repositories saved; `null` when done |
 | `chat.background` | `{sessionId, count}` — opencode subagents of the chat still working after its own turn ended |
 | `chat.message` | `{sessionId, message}` (parts may be empty; carries `segment`, `engine`, `segmentModel`) |
 | `chat.part` | `{sessionId, messageId, part}` (replace by part id) |
@@ -235,6 +264,10 @@ codes (or contain one); the UI words them (`describeError` in
 | `box_key_missing` | a `box` chat with no Upstash Box key |
 | `box_key_invalid` | Upstash refused the key being saved |
 | `box_full` | Box has 10 boxes and none of this app's is idle to archive |
+| `modal_key_missing` | a `modal` chat with no Modal token |
+| `modal_key_invalid` | the text saved holds no token, or Modal refused it |
+| `modal_gpu_budget` | too little of the month's Modal budget is left to start the chat's GPU |
+| `modal_budget_invalid` | the Modal budget saved is not above 0 |
 | `quota_busy` | the plan's sandbox slot is taken by a chat that is working |
 | `sandbox_gone` | the sandbox was deleted while starting; sending again makes a new one |
 | `sandbox_missing` | `files.*` on a chat without a sandbox |
@@ -285,15 +318,16 @@ reads them; opencode stores them as synthetic and its own UIs hide them.
   last, so they win:
   - their sandbox lookups go through `POORDSH_SANDBOX_MAP`
     (`/root/.config/poordsh/sandboxes.json`, `"opencode-<session>"` → the chat's
-    Tensorlake sandbox name, `"phone:<chat id>"` or `"box:<chat id>"`; written by the host for
+    Tensorlake sandbox name, `"phone:<chat id>"`, `"box:<chat id>"` or `"modal:<chat id>"`; written by the host for
     every session it creates or continues); a session without an entry is
     refused;
-  - for `phone:` and `box:` sandboxes, `TensorlakeClient`'s `getOrCreateSandbox`,
+  - for `phone:`, `box:` and `modal:` sandboxes, `TensorlakeClient`'s `getOrCreateSandbox`,
     `executeCommand`, `readFile`, `writeFile`, `listDirectory` and
     `deleteSandbox` go to the device bridge (`POORDSH_PHONE_URL`,
     `POORDSH_PHONE_TOKEN`) instead of Tensorlake (`readFileBounded` is built on
-    the first two); the app serves `box:` ones through Box's API, so the Box key
-    stays in the app. Without a Tensorlake key, `TENSORLAKE_API_KEY` is a
+    the first two); the app serves `box:` ones through Box's API and `modal:`
+    ones through its Modal helper, so the Box key and the Modal token stay in
+    the app. Without a Tensorlake key, `TENSORLAKE_API_KEY` is a
     placeholder so the official plugin's "no credentials" check passes; it is
     never sent anywhere;
   - `bash` asks `ctx.ask({permission:"bash"})` and edits ask `"edit"`, so the

@@ -10,7 +10,7 @@ command line.
 
 ## Decision
 
-Keys typed in the UI (Upstash Box, Tensorlake, TinyFish, the bucket) are encrypted with an Android
+Keys typed in the UI (Modal, Upstash Box, Tensorlake, TinyFish, the bucket) are encrypted with an Android
 Keystore key and written with `commit()`, so they survive the app being killed.
 Backup is disabled. Secrets reach the guest through a 0600 file that the guest
 deletes before exec, never through argv. OpenCode Zen, NVIDIA NIM, OrcaRouter,
@@ -20,6 +20,8 @@ app: sandboxes get files and git bundles from it, not the key
 the app to call TinyFish ([web-in-sandbox](web-in-sandbox.md)), and for the
 Upstash Box key: opencode's tools for a box go through the app's bridge, and
 boxes are made with no environment of the app's ([box-first](box-first.md)).
+The Modal token likewise: the app's helper gets it over a pipe, and sandboxes
+are started with no environment of the app's ([modal-first](modal-first.md)).
 
 Until 0.11 a ChatGPT sign-in was kept on the phone and copied into sandboxes
 for Codex ([opencode-only](opencode-only.md)); it is no longer read.

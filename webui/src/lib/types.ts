@@ -54,6 +54,8 @@ export interface SessionInfo {
   busy: boolean;
   /** Set once the chat has run: where its work lives. */
   place?: Place | null;
+  /** The chat's Modal sandbox has a GPU (docs/adr/modal-first.md). */
+  gpu?: boolean;
 }
 
 export type PartStatus = "pending" | "running" | "completed" | "error";
@@ -235,16 +237,32 @@ export interface ApprovalRequest {
 export interface Accounts {
   /** `keys`: the providers whose API key is stored ("opencode" is OpenCode Zen). */
   opencode: { keys: string[]; state: BackendStatus } | null;
-  /** A key puts new chats in Upstash boxes while the month's free CPU lasts (docs/adr/box-first.md). */
+  /** A token puts new chats in Modal while the month's budget lasts (docs/adr/modal-first.md). */
+  modal?: { keySet: boolean };
+  /** A key puts new chats in Upstash boxes when Modal can't take them, while the month's free CPU lasts (docs/adr/box-first.md). */
   box?: { keySet: boolean };
-  /** A key puts chats in Tensorlake sandboxes when Upstash Box can't take them; without either, on-device jails. */
+  /** A key puts chats in Tensorlake sandboxes when neither can take them; without any, on-device jails. */
   tensorlake: { keySet: boolean };
   /** A key lets web search and fetch fall back to TinyFish when the usual service runs out. */
   tinyfish: { keySet: boolean };
 }
 
-/** Where a chat runs, fixed on its first message ("cloud" is Tensorlake). A "box" chat Box refuses for usage moves once. */
-export type Place = "box" | "cloud" | "phone";
+/**
+ * Where a chat runs, fixed on its first message ("cloud" is Tensorlake). A "modal" or
+ * "box" chat its service no longer takes for the month moves once, to the next place.
+ */
+export type Place = "modal" | "box" | "cloud" | "phone";
+
+/** This month's Modal cost (`modal.usage`) against the budget set in Settings, and the GPUs Modal prices. */
+export interface ModalUsage {
+  month: string;
+  spentUsd: number;
+  budgetUsd: number;
+  /** Modal refused work for usage this month: new chats go elsewhere. */
+  spent: boolean;
+  /** Cheapest first; `id` is what a sandbox asks for. */
+  gpus: { id: string; usdPerHour: number }[];
+}
 
 /** This month's CPU in Upstash Box (`box.usage`), against the free plan's allowance. */
 export interface BoxUsage {
@@ -281,6 +299,10 @@ export interface Settings {
   subagentModel?: string | null;
   subagentEffort?: string | null;
   titleModel?: string | null;
+  /** What a month of Modal may cost, in USD. */
+  modalBudgetUsd?: number;
+  /** The GPU chats that turn it on get in Modal. */
+  modalGpu?: string;
 }
 
 export interface ToolUpdateInfo {
@@ -300,7 +322,7 @@ export interface AppInfo {
 }
 
 /** What a chat's message is waiting for before its engine gets it (`chat.stage`). */
-export type Stage = "sandbox" | "upload" | "install" | "engine";
+export type Stage = "sandbox" | "tools" | "room" | "move" | "upload" | "install" | "engine";
 
 /** One entry of a chat sandbox's working folder (`files.list`). */
 export interface FileEntry {

@@ -3,6 +3,7 @@ package dev.mokouliszt.poordsh.settings
 import android.content.Context
 import dev.mokouliszt.poordsh.backend.EngineOptions
 import dev.mokouliszt.poordsh.bridge.jsonOf
+import dev.mokouliszt.poordsh.modal.ModalSandboxes
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -67,6 +68,16 @@ class Settings(context: Context) {
         get() = prefs.getString("title_model", null)
         set(v) { prefs.edit().putString("title_model", v).apply() }
 
+    /** What a month of Modal may cost, in USD (docs/adr/modal-first.md); its Starter credits by default. */
+    var modalBudgetUsd: Double
+        get() = prefs.getFloat("modal_budget_usd", ModalSandboxes.DEFAULT_BUDGET_USD.toFloat()).toDouble()
+        set(v) { prefs.edit().putFloat("modal_budget_usd", v.toFloat()).apply() }
+
+    /** The GPU a chat gets in Modal when it asks for one (an id Modal takes, such as "T4"). */
+    var modalGpu: String
+        get() = prefs.getString("modal_gpu", null) ?: DEFAULT_MODAL_GPU
+        set(v) { prefs.edit().putString("modal_gpu", v).apply() }
+
     /** Install newer opencode releases when the app finds them at launch. */
     var autoUpdateEngines: Boolean
         get() = prefs.getBoolean("auto_update_engines", false)
@@ -106,5 +117,12 @@ class Settings(context: Context) {
         "subagentModel" to subagentModel,
         "subagentEffort" to subagentEffort,
         "titleModel" to titleModel,
+        "modalBudgetUsd" to modalBudgetUsd,
+        "modalGpu" to modalGpu,
     )
+
+    companion object {
+        /** Modal's cheapest GPU (November 2026); any id Modal's rates list can replace it. */
+        const val DEFAULT_MODAL_GPU = "T4"
+    }
 }

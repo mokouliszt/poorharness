@@ -50,3 +50,9 @@ export function fileSize(n: number | null | undefined): string {
   }
   return `${v >= 10 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
 }
+
+/** US dollars, to the cent: $0.59, $12.30, $30. */
+export function usd(n: number): string {
+  const s = n.toFixed(2);
+  return "$" + (s.endsWith(".00") ? s.slice(0, -3) : s);
+}

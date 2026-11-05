@@ -9,6 +9,9 @@ import dev.mokouliszt.poordsh.chat.ChatStore
 import dev.mokouliszt.poordsh.engine.EngineManager
 import dev.mokouliszt.poordsh.git.GitBucket
 import dev.mokouliszt.poordsh.git.GitRepos
+import dev.mokouliszt.poordsh.modal.ModalAgent
+import dev.mokouliszt.poordsh.modal.ModalOps
+import dev.mokouliszt.poordsh.modal.ModalSandboxes
 import dev.mokouliszt.poordsh.outputs.OutputService
 import dev.mokouliszt.poordsh.outputs.OutputShelf
 import dev.mokouliszt.poordsh.phone.PhoneSandboxManager
@@ -67,9 +70,13 @@ class AppGraph(context: Context) {
     fun tensorlakeKey(): String? = secrets.get(SecretStore.TENSORLAKE_API_KEY)
     fun hasTensorlakeKey() = tensorlakeKey() != null
 
-    /** Upstash Box, the first place for new chats (docs/adr/box-first.md); its key stays in the app. */
+    /** Upstash Box, the second place for new chats (docs/adr/box-first.md); its key stays in the app. */
     fun boxKey(): String? = secrets.get(SecretStore.UPSTASH_BOX_API_KEY)
     fun hasBoxKey() = boxKey() != null
+
+    /** Modal, the first place for new chats (docs/adr/modal-first.md); its token stays in the app. */
+    fun modalToken(): ModalAgent.Token? = ModalAgent.Token.fromJson(secrets.get(SecretStore.MODAL_TOKEN))
+    fun hasModalKey() = secrets.get(SecretStore.MODAL_TOKEN) != null
 
     /** The user's S3-compatible bucket, when connected (docs/adr/s3-storage.md). */
     @Volatile private var s3Cache: Pair<String, S3Storage>? = null
@@ -91,6 +98,19 @@ class AppGraph(context: Context) {
     val boxApi = BoxApi(::boxKey)
     val boxes = BoxSandboxes(boxApi, File(context.filesDir, "box-state.json"), Logs.box)
     val runtime = RuntimeManager(context, paths, installer, guestEnv, keepalive)
+    val modalAgent = ModalAgent(
+        paths, proot, runtime,
+        script = { context.assets.open("modal/poordsh-modal.py").use { it.readBytes() } },
+        token = ::modalToken,
+        log = Logs.modal,
+    )
+    val chatStore = ChatStore(File(context.filesDir, "chats"))
+    val modal = ModalSandboxes(
+        modalAgent, File(context.filesDir, "modal-state.json"), Logs.modal,
+        budgetUsd = { settings.modalBudgetUsd },
+        gpuType = { settings.modalGpu },
+        gpuFor = chatStore::gpu,
+    )
 
     // On-device fallback used when there is no Tensorlake key: one PRoot jail per chat.
     val phoneSandboxes = PhoneSandboxManager(paths, proot, runtime, Logs.tensorlake)
@@ -103,6 +123,7 @@ class AppGraph(context: Context) {
             }
         }
         bridge.box = BoxOps(boxes, boxApi)
+        bridge.modal = ModalOps(modal, modalAgent)
     }
 
     fun engineOptions(): Set<String> = settings.engineOptions
@@ -125,7 +146,6 @@ class AppGraph(context: Context) {
         gitRepos = { s3() != null },
     )
     val engines = EngineManager(runtime, listOf(opencode), File(context.filesDir, "cache"), keepalive, BuildConfig.VERSION_NAME)
-    val chatStore = ChatStore(File(context.filesDir, "chats"))
 
     /** Files agents hand over: in the Ubuntu home's `outputs` folder, or the bucket's `outputs` folder. */
     val outputs = OutputService(
@@ -138,8 +158,13 @@ class AppGraph(context: Context) {
         log = { Logs.app.add(it) },
     )
     val chats = ChatService(
-        chatStore, engines, tensorlakeSandboxes, boxes, phoneSandboxes, ::hasTensorlakeKey, ::hasBoxKey, skills, plugins, outputs,
-    ).also { it.moveStaging = File(context.cacheDir, "box-move") }
+        chatStore, engines, tensorlakeSandboxes, boxes, modal, phoneSandboxes, ::hasTensorlakeKey, ::hasBoxKey, ::hasModalKey,
+        skills, plugins, outputs,
+    ).also { chats ->
+        chats.moveStaging = File(context.cacheDir, "box-move")
+        // Installing Modal's SDK on first use takes a minute or two; waiting chats say so.
+        modalAgent.onStage = chats::stageSending
+    }
     /** Git for agents, kept in the bucket's `git` folder (docs/adr/git-repos.md). */
     val git = GitRepos(
         bucket = { s3()?.let { GitBucket.of(it.space(S3Storage.GIT)) } },
@@ -177,6 +202,7 @@ class AppGraph(context: Context) {
         engines.stopAllNow()
         sandboxes.suspendAllNow()
         if (hasBoxKey()) boxes.suspendAllNow()
+        if (hasModalKey()) modal.suspendAllNow()
         phoneSandboxes.stopAllNow()
         keepalive.clear()
         chats.emitUi("app.exit")

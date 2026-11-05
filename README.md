@@ -4,8 +4,9 @@
 
 A coding agent you drive from your Android phone. PoorHarness runs the official
 [opencode](https://github.com/anomalyco/opencode) behind a chat interface, and
-each chat works in a sandbox of its own: an [Upstash Box](https://upstash.com/box)
-or [Tensorlake](https://www.tensorlake.ai) cloud sandbox if you add a key,
+each chat works in a sandbox of its own: a [Modal](https://modal.com),
+[Upstash Box](https://upstash.com/box) or [Tensorlake](https://www.tensorlake.ai)
+cloud sandbox if you add a token or key,
 otherwise a confined folder on the phone (a PRoot jail). Every model and provider in a chat uses the same sandbox, so you
 can switch mid-chat and keep the files.  
 *Note: The name “PoorDSH” appears in some places as a remnant of the fact that this was originally based on DeepSeekHarness, but there are no issues with its functionality.
@@ -13,13 +14,17 @@ can switch mid-chat and keep the files.
 There is no server of your own to run or pay for, and nothing is required to
 start. Optional:
 
-- **An Upstash Box API key** moves new chats into cloud boxes. The free plan
-  works: up to 10 boxes, each with 2 vCPU, 4 GB of memory and 10 GB of disk,
-  and 5 hours of CPU a month (CPU actually used; a box waiting for the model
-  uses almost none).
-- **A Tensorlake API key** takes new chats when there is no Upstash key or
-  Box's free CPU for the month is used up. Its free plan runs one sandbox at a
-  time, with 1 vCPU, 1 GB of memory and 10 GB of disk.
+- **A Modal token** moves new chats into Modal sandboxes, billed by the second
+  against Modal's monthly credits ($30 on the Starter plan). A sandbox starts in
+  about a second and keeps its files between uses as a snapshot, and a chat can
+  have a GPU. You set a monthly budget in the app: from 80% of it new chats
+  start elsewhere, and at 95% chats in Modal move to the next sandbox.
+- **An Upstash Box API key** takes new chats when there is no Modal token or
+  Modal's budget is nearly used. The free plan works: up to 10 boxes, each with
+  2 vCPU, 4 GB of memory and 10 GB of disk, and 5 hours of CPU a month (CPU
+  actually used; a box waiting for the model uses almost none).
+- **A Tensorlake API key** takes new chats when neither can. Its free plan runs
+  one sandbox at a time, with 1 vCPU, 1 GB of memory and 10 GB of disk.
 - **For models, any of these:**
   - nothing: opencode uses OpenCode Zen's free models without an account;
   - an OpenCode Zen key, for paid models and higher limits;
@@ -47,7 +52,7 @@ start. Optional:
 ## How it works
 
 ```
- Phone                                       Upstash Box, else Tensorlake
+ Phone                                       Modal, else Upstash Box, else Tensorlake
  +------------------------------------+      (with a key)
  | WebView UI -- Kotlin host          |      +-----------------------------+
  |               |- PRoot: Ubuntu     |      | one sandbox per chat        |
@@ -61,12 +66,20 @@ start. Optional:
  +------------------------------------+      +-----------------------------+
 ```
 
-- A chat's sandbox is chosen with its first message: Upstash Box if a key is
-  set and the month's free CPU is not nearly used up, then Tensorlake if a key
-  is set, otherwise a jail on the phone. It does not change after that, even
-  when you switch models; the one exception is a Box chat that hits Box's usage
-  limit, which moves to Tensorlake (or the phone), taking its files when Box
-  still lets them be read.
+- A chat's sandbox is chosen with its first message: Modal if a token is set
+  and the month's budget is not nearly used, then Upstash Box if a key is set
+  and the month's free CPU is not nearly used up, then Tensorlake if a key is
+  set, otherwise a jail on the phone. It does not change after that, even when
+  you switch models; the one exception is a Modal or Box chat that reaches its
+  service's limit, which moves to the next sandbox, taking its files when they
+  can still be read.
+- A Modal sandbox is saved as a snapshot when its chat's turn ends and stopped
+  a minute later; the next message starts it from the snapshot in about a
+  second, with every file. Snapshots expire after 30 days unused and are deleted
+  with the chat. A chat turns a GPU on in its options (the type, T4 by default,
+  is chosen in Settings with Modal's prices); a GPU sandbox left idle for 10
+  minutes during a turn is saved and stopped. The first token installs Modal's tools in the
+  app (a minute or two); the token stays in the app.
 - A box or a Tensorlake sandbox is paused a minute after it was last used and
   deleted with the chat. Box's free plan allows 10 boxes, paused ones included:
   for an 11th chat, the box used longest ago is saved as a snapshot and deleted,
@@ -81,8 +94,8 @@ start. Optional:
   address. Every tool it has that reads files or runs commands runs in the
   chat's sandbox through the official
   [tensorlake-opencode](https://github.com/tensorlakeai/opencode-tensorlake-plugin)
-  plugin, which PoorHarness routes to the box or the jail when the chat is
-  there. If those tools
+  plugin, which PoorHarness routes to the Modal sandbox, the box or the jail
+  when the chat is there. If those tools
   cannot be loaded, opencode does not run anything.
 - Web pages and searches are fetched from the chat's sandbox, not from the phone
   (the sandbox needs python3). If the search service reports a usage limit, an
@@ -158,6 +171,12 @@ start. Optional:
 - On Tensorlake's free plan only one cloud chat works at a time; starting
   another pauses sandboxes that are idle, and waits if the other chat is still
   working.
+- **Set a spend limit in Modal too.** The app counts what its sandboxes ask
+  for and reads Modal's bill, which lags by minutes, so a heavy GPU turn can go
+  past the budget before the app sees it. Modal's own limit is what really caps
+  the bill. Programs in a Modal sandbox stop a minute after the turn ends (the
+  files stay). If the app is killed or the phone goes offline, Modal stops the
+  sandbox within 5 minutes (2 with a GPU).
 - **Programs in a box stop when it pauses**, a minute after the turn ends (the
   files stay). If the app is killed or the phone goes offline, the box ends
   them itself after 10 minutes, and the app pauses the box when it starts
@@ -203,7 +222,8 @@ For UI work without a phone:
 cd webui && npm install && npm run dev
 ```
 
-A mock host stands in for the app (`?setup` shows first run, `?box` with an
+A mock host stands in for the app (`?setup` shows first run, `?modal` with a
+Modal token, `?modalnear` with Modal past 80% of its budget, `?box` with an
 Upstash Box key, `?boxspent` with Box's free CPU used up, `?nokey` without
 a Tensorlake key, `?nim` with an NVIDIA NIM key, `?orca` with an OrcaRouter
 key, `?infron` with an Infron key, `?venice` with a Venice key, `?nos3` without a bucket, `?prompt` with a
@@ -216,7 +236,7 @@ fit).
 
 | Path | Contents |
 |---|---|
-| `android/` | Kotlin host: runtime installer, PRoot launcher, opencode client, Upstash Box and Tensorlake clients, device jails, bucket and git storage, WebView bridge |
+| `android/` | Kotlin host: runtime installer, PRoot launcher, opencode client, Modal, Upstash Box and Tensorlake clients, device jails, bucket and git storage, WebView bridge |
 | `webui/` | React UI |
 | `runtime/` | recipes for PRoot and the Ubuntu image, pinned versions and checksums |
 | `tools/` | build script, icon generator |

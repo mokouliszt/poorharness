@@ -129,6 +129,25 @@ class ChatStore(private val dir: File) {
         save(id)
     }
 
+    /** The one change of place a chat can have: out of a cloud that no longer takes it (docs/adr/box-first.md). */
+    @Synchronized
+    fun movePlace(id: String, place: Place) {
+        val c = chats[id] ?: return
+        c.put("place", place.id)
+        save(id)
+    }
+
+    /** Whether the chat's Modal sandbox has a GPU (docs/adr/modal-first.md). */
+    @Synchronized
+    fun gpu(id: String): Boolean = chats[id]?.optBoolean("gpu") == true
+
+    @Synchronized
+    fun setGpu(id: String, on: Boolean) {
+        val c = chats[id] ?: return
+        if (on) c.put("gpu", true) else c.remove("gpu")
+        save(id)
+    }
+
     @Synchronized
     fun title(id: String): String = chats[id]?.optString("title").orEmpty()
 
@@ -269,6 +288,7 @@ class ChatStore(private val dir: File) {
         "model" to c.str("model"),
         "effort" to c.str("effort"),
         "place" to c.optString("place").takeIf { it.isNotBlank() },
+        "gpu" to c.optBoolean("gpu"),
     )
 
     private fun save(id: String) {

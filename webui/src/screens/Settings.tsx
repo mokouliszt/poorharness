@@ -9,8 +9,10 @@ import {
   loadPlugins,
   loadSkills,
   hasBoxKey,
+  hasModalKey,
   hasProviderKey,
   hasTensorlakeKey,
+  loadModalUsage,
   loadVersions,
   push,
   refreshAccounts,
@@ -18,6 +20,8 @@ import {
   setProviderKeySheet,
   setBoxSheet,
   setKeySheet,
+  setModalKeySheet,
+  setModalSheet,
   setTinyfishSheet,
   hasTinyfishKey,
   onBackClose,
@@ -31,7 +35,7 @@ import {
 } from "@/lib/store";
 import { describeError, useT } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
-import { fileSize } from "@/lib/format";
+import { fileSize, usd } from "@/lib/format";
 import { count, partsSummary } from "@/screens/Installed";
 import type { Approval, BoxUsage, Engine } from "@/lib/types";
 import { TopBar } from "@/components/TopBar";
@@ -71,6 +75,7 @@ export function SettingsScreen() {
       <div className="scroll-quiet min-h-0 flex-1 overflow-y-auto px-4 pb-10">
         {anyBusy && <p className="px-1 pt-3 text-sm text-mute">{t("settings.busyNote")}</p>}
         <Section title={t("settings.accounts")}>
+          <ModalRow />
           <BoxRow />
           <TensorlakeRow />
           <ProviderKeyRow provider="opencode" />
@@ -483,10 +488,48 @@ function TinyFishRow() {
   );
 }
 
-/** Upstash Box: new chats start here while the month's free CPU lasts; the line shows how much is used. */
+/** Modal: new chats start here while the month's budget lasts; the line shows how much is used. */
+function ModalRow() {
+  const t = useT();
+  const keySet = useStore(hasModalKey);
+  const usage = useStore((s) => s.modalUsage);
+  const gpu = useStore((s) => s.settings?.modalGpu);
+  useEffect(() => {
+    if (keySet) void loadModalUsage();
+  }, [keySet]);
+  const line = !keySet
+    ? t("modal.none")
+    : !usage
+      ? t("modal.set")
+      : usage.spent
+        ? t("modal.spent")
+        : usage.spentUsd >= usage.budgetUsd * 0.8
+          ? t("modal.nearBudget", { spent: usd(usage.spentUsd), budget: usd(usage.budgetUsd) })
+          : t("modal.usage", { spent: usd(usage.spentUsd), budget: usd(usage.budgetUsd) }) + (gpu ? ` · GPU ${gpu}` : "");
+  return (
+    <Row>
+      <div className="min-w-0 flex-1">
+        <div>Modal</div>
+        <div className="text-xs text-mute">{line}</div>
+      </div>
+      {keySet ? (
+        <Button size="sm" onClick={() => setModalSheet(true)}>
+          {t("modal.edit")}
+        </Button>
+      ) : (
+        <Button size="sm" onClick={() => setModalKeySheet(true)}>
+          {t("modal.add")}
+        </Button>
+      )}
+    </Row>
+  );
+}
+
+/** Upstash Box: new chats start here (after Modal) while the month's free CPU lasts; the line shows how much is used. */
 function BoxRow() {
   const t = useT();
   const keySet = useStore(hasBoxKey);
+  const modalFirst = useStore(hasModalKey);
   const [usage, setUsage] = useState<BoxUsage | null>(null);
   useEffect(() => {
     if (!keySet) {
@@ -499,9 +542,9 @@ function BoxRow() {
   }, [keySet]);
   const hours = (n: number) => (Math.round(n * 10) / 10).toString();
   const line = !keySet
-    ? t("box.none")
+    ? t(modalFirst ? "box.noneBackup" : "box.none")
     : !usage
-      ? t("box.set")
+      ? t(modalFirst ? "box.setBackup" : "box.set")
       : usage.spent
         ? t("box.spent")
         : t("box.usage", { used: hours(usage.usedHours), free: hours(usage.freeHours) });
@@ -534,7 +577,7 @@ function BoxRow() {
 function TensorlakeRow() {
   const t = useT();
   const keySet = useStore(hasTensorlakeKey);
-  const boxFirst = useStore(hasBoxKey);
+  const boxFirst = useStore((s) => hasBoxKey(s) || hasModalKey(s));
   return (
     <Row>
       <div className="min-w-0 flex-1">

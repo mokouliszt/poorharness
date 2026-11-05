@@ -1,12 +1,13 @@
-# PoorHarness's command runner in an Upstash box (docs/adr/box-first.md).
+# PoorHarness's command runner in a cloud sandbox: an Upstash box or a Modal
+# sandbox (docs/adr/box-first.md, docs/adr/modal-first.md).
 #
 #   run   <cwd> <timeout> <command>                  runs it in this call
 #   start <dir> <cwd> <timeout> <command> <wait>     runs it apart, then waits as "wait" does
 #   wait  <dir> <wait>                               waits up to <wait> s for a started command
 #   alive <limit> [folder...]                        the app is here: makes the folders, starts the watchdog
 #
-# Box's gateway ends a call after 300 s, so a command allowed longer is started
-# apart and waited for over several calls. A started command still running after
+# Box's gateway ends a call after 300 s, so there a command allowed longer is
+# started apart and waited for over several calls (Modal has no such limit). A started command still running after
 # <wait> s exits 75 with "poordsh-runner: pending" on stderr; the app calls "wait"
 # again. Output goes to files, never to this call's pipes, so "cmd &" lets the
 # call return while the background process keeps running. stdout and stderr are

@@ -29,6 +29,8 @@ import dev.mokouliszt.poordsh.skills.SkillStore
 import dev.mokouliszt.poordsh.skills.SkillSync
 import dev.mokouliszt.poordsh.tensorlake.SandboxManager
 import dev.mokouliszt.poordsh.tensorlake.TensorlakeSandboxes
+import dev.mokouliszt.poordsh.modal.ModalAgent
+import dev.mokouliszt.poordsh.modal.ModalSandboxes
 import dev.mokouliszt.poordsh.upstash.BoxApi
 import dev.mokouliszt.poordsh.upstash.BoxSandboxes
 import kotlinx.coroutines.CoroutineScope
@@ -52,8 +54,8 @@ import java.util.concurrent.atomic.AtomicLong
  * Chats as the UI sees them. Turns engine events (keyed by engine session) into
  * UI events keyed by chat, and copies each finished turn into [ChatStore].
  *
- * Each chat works in its own sandbox ([Place]): an Upstash box, a Tensorlake
- * sandbox or a device jail. A chat whose last session belongs to an engine this
+ * Each chat works in its own sandbox ([Place]): a Modal sandbox, an Upstash box,
+ * a Tensorlake sandbox or a device jail. A chat whose last session belongs to an engine this
  * build no longer has (Codex, before 0.11) goes on in opencode with its history.
  */
 class ChatService(
@@ -61,9 +63,11 @@ class ChatService(
     private val engines: EngineManager,
     private val tensorlake: TensorlakeSandboxes,
     private val boxes: BoxSandboxes,
+    private val modal: ModalSandboxes,
     private val phoneSandboxes: PhoneSandboxManager,
     private val hasTensorlakeKey: () -> Boolean,
     private val hasBoxKey: () -> Boolean,
+    private val hasModalKey: () -> Boolean,
     private val skills: SkillStore,
     private val plugins: PluginStore,
     private val outputs: OutputService,
@@ -91,7 +95,7 @@ class ChatService(
     private val copyLocks = ConcurrentHashMap<String, Mutex>()
     /** "<what> <chat id>" -> "<sandbox id> <digest>" last synced in this process (skills, plugins). */
     private val foldersSynced = ConcurrentHashMap<String, String>()
-    /** Where a workspace waits while it moves out of Box; set by the app. */
+    /** Where a workspace waits while it moves out of Modal or Box; set by the app. */
     var moveStaging: File = File(System.getProperty("java.io.tmpdir"), "poordsh-move")
 
     init {
@@ -102,7 +106,12 @@ class ChatService(
         if (hasBoxKey()) boxes.pauseStrays()
         // Making room in Box (archiving another chat's box) can take a minute; the chat says so.
         boxes.onStage = { chatId, s -> stage(chatId, s ?: "sandbox") }
+        // Sandboxes a killed app left running in Modal are saved and stopped.
+        if (hasModalKey()) modal.recoverStrays(store::exists)
     }
+
+    /** A stage every chat waiting for its sandbox shows (installing Modal's tools: "tools"); null for back to "sandbox". */
+    fun stageSending(s: String?) = sending.forEach { stage(it, s ?: "sandbox") }
 
     fun emitUi(type: String, payload: JSONObject = JSONObject()) {
         payload.put("type", type)
@@ -119,6 +128,16 @@ class ChatService(
 
     fun title(chatId: String) = store.title(chatId)
 
+    /**
+     * Whether the chat's Modal sandbox has a GPU ([ModalSandboxes]); the sandbox
+     * is started again with or without one on the chat's next message.
+     */
+    fun setGpu(chatId: String, on: Boolean) {
+        if (!store.exists(chatId)) return
+        store.setGpu(chatId, on)
+        emitUi("sessions.upsert", jsonOf("session" to metaOf(chatId)))
+    }
+
     /** Where a chat runs; the Files bridge reads cloud sandboxes or the device jail accordingly. */
     fun placeOf(chatId: String): Place = store.place(chatId)
 
@@ -128,6 +147,7 @@ class ChatService(
 
     /** The service that holds a cloud place's sandboxes; null for the device. */
     fun cloudOf(place: Place): CloudSandboxes? = when (place) {
+        Place.MODAL -> modal
         Place.BOX -> boxes
         Place.CLOUD -> tensorlake
         Place.PHONE -> null
@@ -135,16 +155,21 @@ class ChatService(
 
     /** Whether the key a place needs is set (the device needs none). */
     fun hasKeyFor(place: Place): Boolean = when (place) {
+        Place.MODAL -> hasModalKey()
         Place.BOX -> hasBoxKey()
         Place.CLOUD -> hasTensorlakeKey()
         Place.PHONE -> true
     }
 
-    /** Where a new chat starts (docs/adr/box-first.md): Upstash Box, then Tensorlake, then the device. */
-    private fun newPlace(): Place = if (hasBoxKey() && boxes.allowsNewChats()) Place.BOX else fallbackPlace()
+    /** Where a new chat starts (docs/adr/modal-first.md): Modal, then Upstash Box, then Tensorlake, then the device. */
+    private fun newPlace(): Place = if (hasModalKey() && modal.allowsNewChats()) Place.MODAL else placeAfter(Place.MODAL)
 
-    /** Where a chat goes when Box is not an option. */
-    private fun fallbackPlace(): Place = if (hasTensorlakeKey()) Place.CLOUD else Place.PHONE
+    /** Where a chat goes when [from] no longer takes it. */
+    private fun placeAfter(from: Place): Place = when {
+        from == Place.MODAL && hasBoxKey() && boxes.allowsNewChats() -> Place.BOX
+        hasTensorlakeKey() -> Place.CLOUD
+        else -> Place.PHONE
+    }
 
     fun hasRun(chatId: String) = store.exists(chatId) && store.messages(chatId).length() > 0
 
@@ -157,15 +182,19 @@ class ChatService(
     suspend fun send(chatId: String, text: String, model: ModelRef, modelName: String?, files: List<String> = emptyList()) {
         if (!store.exists(chatId)) throw IOException("chat not found")
         if (text.isBlank() && files.isEmpty()) throw IOException("empty message")
-        // The place is fixed on the first message (newPlace); Box's use this month is
-        // read first, so a nearly spent allowance sends the chat elsewhere.
+        // The place is fixed on the first message (newPlace); this month's use of Modal
+        // and Box is read first, so a nearly spent allowance sends the chat elsewhere.
         if (store.messages(chatId).length() == 0) {
+            if (hasModalKey()) runCatching { modal.usage() }.onFailure { Logs.modal.add("usage not read: ${it.message}") }
             if (hasBoxKey()) runCatching { boxes.usage() }.onFailure { Logs.box.add("usage not read: ${it.message}") }
             store.setPlace(chatId, newPlace())
+        } else if (store.place(chatId) == Place.MODAL && hasModalKey()) {
+            runCatching { modal.usage() }.onFailure { Logs.modal.add("usage not read: ${it.message}") }
         }
         var place = store.place(chatId)
         if (place == Place.CLOUD && !hasTensorlakeKey()) throw IOException("tensorlake_key_missing")
         if (place == Place.BOX && !hasBoxKey()) throw IOException("box_key_missing")
+        if (place == Place.MODAL && !hasModalKey()) throw IOException("modal_key_missing")
         val engine = model.backend
         // Recorded before anything starts, so a chat whose start fails still has a name.
         if (store.title(chatId).isBlank()) {
@@ -184,26 +213,44 @@ class ChatService(
             // Phone: a device jail whose files persist on disk, so never a reset.
             var cloud: RemoteSandbox? = null
             var reset = false
+            val ran = store.messages(chatId).length() > 0
+            // Modal: a chat moves on before the month's budget runs out, while its files
+            // can still be copied out, or when Modal refuses it.
+            if (place == Place.MODAL && ran && modal.shouldLeave()) {
+                val to = placeAfter(Place.MODAL)
+                reset = !moveTo(chatId, place, to, token)
+                place = to
+            }
+            if (place == Place.MODAL) {
+                try {
+                    val ready = modal.ensure(chatId)
+                    cloud = ready.sandbox
+                    reset = ready.fresh && ran
+                } catch (e: ModalAgent.ModalException) {
+                    if (e.kind != "usage") throw e
+                    val to = placeAfter(Place.MODAL)
+                    reset = !moveTo(chatId, place, to, token)
+                    place = to
+                }
+            }
             if (place == Place.BOX) {
                 try {
                     val ready = boxes.ensure(chatId)
                     cloud = ready.sandbox
-                    reset = ready.fresh && store.messages(chatId).length() > 0
+                    reset = ready.fresh && ran
                 } catch (e: BoxApi.UsageLimit) {
                     // Box refuses this chat for the month: it goes on in the next place.
-                    val to = fallbackPlace()
-                    sbRelease(chatId, place, token)
-                    sbAcquire(chatId, to, token)
-                    reset = !moveOutOfBox(chatId, to)
+                    val to = placeAfter(Place.BOX)
+                    reset = !moveTo(chatId, place, to, token)
                     place = to
                 } catch (e: BoxSandboxes.Full) {
                     // Ten boxes and none to archive: a new chat starts in the next place instead.
-                    if (store.messages(chatId).length() > 0) throw e
-                    val to = fallbackPlace()
+                    if (ran) throw e
+                    val to = placeAfter(Place.BOX)
                     Logs.box.add("$chatId: no room in Upstash Box; starting in ${to.id}")
                     sbRelease(chatId, place, token)
                     sbAcquire(chatId, to, token)
-                    store.setPlace(chatId, to)
+                    store.movePlace(chatId, to)
                     place = to
                 }
             }
@@ -212,8 +259,8 @@ class ChatService(
             } else if (place == Place.CLOUD) {
                 val ready = tensorlake.ensure(chatId)
                 cloud = ready.sandbox
-                // A chat just moved out of Box had its sandbox made, and its files copied in, by the move.
-                if (ready.fresh && store.messages(chatId).length() > 0) reset = true
+                // A chat just moved here had its sandbox made, and its files copied in, by the move.
+                if (ready.fresh && ran) reset = true
             }
             val skillSet = skills.snapshot()
             syncFolders(chatId, place, cloud, "skills", SkillSync.folders, skillSet, skills::file)
@@ -292,25 +339,35 @@ class ChatService(
         cloudOf(place)?.release(chatId, token) ?: phoneSandboxes.release(chatId, token)
 
     /**
-     * Moves a chat Box refuses for usage to [to] (docs/adr/box-first.md): its
-     * workspace is copied over when Box still lets the files be read, and the chat's
-     * place changes for good. True if the files came along; otherwise the chat goes
-     * on in an empty sandbox and the box stays until the chat is deleted.
+     * Moves a chat out of [from] (Modal or Box, which no longer take it) to [to],
+     * for good (docs/adr/modal-first.md, docs/adr/box-first.md); [token] moves with
+     * it. Its workspace is copied over when [from] still lets the files be read,
+     * and the old sandbox then goes. True if the files came along; otherwise the
+     * chat goes on in an empty sandbox and the old one stays until the chat is deleted.
      */
-    private suspend fun moveOutOfBox(chatId: String, to: Place): Boolean {
+    private suspend fun moveTo(chatId: String, from: Place, to: Place, token: String): Boolean {
         stage(chatId, "move")
-        Logs.box.add("$chatId: Upstash Box refused it for usage; moving to ${to.id}")
+        val log = if (from == Place.MODAL) Logs.modal else Logs.box
+        log.add("$chatId: moving from ${from.id} to ${to.id}")
+        sbRelease(chatId, from, token)
+        sbAcquire(chatId, to, token)
         val staging = File(moveStaging, chatId).apply { deleteRecursively(); mkdirs() }
         try {
-            if (!boxes.downloadWorkspace(chatId, staging)) {
-                store.setPlace(chatId, to)
+            val copied = when (from) {
+                Place.MODAL -> modal.downloadWorkspace(chatId, staging)
+                Place.BOX -> boxes.downloadWorkspace(chatId, staging)
+                else -> false
+            }
+            if (!copied) {
+                store.movePlace(chatId, to)
                 return false
             }
             withContext(Dispatchers.IO) {
-                if (to == Place.PHONE) {
+                val target = cloudOf(to)
+                if (target == null) {
                     staging.copyRecursively(phoneSandboxes.dirs(chatId).workspace, overwrite = true)
                 } else {
-                    val target = tensorlake.ensure(chatId).sandbox
+                    val sb = target.ensure(chatId).sandbox
                     val zip = File(moveStaging, "$chatId.zip")
                     try {
                         java.util.zip.ZipOutputStream(zip.outputStream().buffered()).use { out ->
@@ -321,22 +378,22 @@ class ChatService(
                             }
                         }
                         val remote = "/tmp/poordsh-move.zip"
-                        target.upload(remote, zip)
-                        val r = target.run("python3", listOf("-c", UNZIP, remote, SandboxManager.WORKSPACE), timeoutSecs = 600)
+                        sb.upload(remote, zip)
+                        val r = sb.run("python3", listOf("-c", UNZIP, remote, SandboxManager.WORKSPACE), timeoutSecs = 600)
                         if (r.exitCode != 0) throw IOException("could not unpack: ${r.stderr.trim().takeLast(200)}")
                     } finally {
                         zip.delete()
                     }
                 }
             }
-            store.setPlace(chatId, to)
-            // The files are across: the box can go and free its slot.
-            runCatching { boxes.delete(chatId) }
-            Logs.box.add("$chatId: workspace moved to ${to.id}")
+            store.movePlace(chatId, to)
+            // The files are across: the old sandbox can go.
+            runCatching { cloudOf(from)?.delete(chatId) }
+            log.add("$chatId: workspace moved to ${to.id}")
             return true
         } catch (e: Exception) {
-            Logs.box.add("$chatId: workspace not moved (${e.message})")
-            store.setPlace(chatId, to)
+            log.add("$chatId: workspace not moved (${e.message})")
+            store.movePlace(chatId, to)
             return false
         } finally {
             staging.deleteRecursively()
@@ -379,6 +436,7 @@ class ChatService(
             }
             if (place == Place.CLOUD && hasTensorlakeKey()) deleteIn(Place.CLOUD, chatId)
             if (hasBoxKey()) deleteIn(Place.BOX, chatId)
+            if (hasModalKey()) deleteIn(Place.MODAL, chatId)
         }
     }
 
@@ -386,9 +444,12 @@ class ChatService(
         val cloud = cloudOf(place) ?: return
         runCatching { cloud.delete(chatId) }.onFailure {
             Logs.app.add("$chatId: ${place.id} sandbox delete failed (${it.message}); will retry")
-            // Tensorlake's list holds sandbox names, as it has since 0.2; Box's holds chat ids.
-            if (place == Place.BOX) store.addPendingDelete(BOX_PENDING, chatId)
-            else store.addPendingDelete(TENSORLAKE_PENDING, SandboxManager.nameFor(chatId))
+            // Tensorlake's list holds sandbox names, as it has since 0.2; Box's and Modal's hold chat ids.
+            when (place) {
+                Place.BOX -> store.addPendingDelete(BOX_PENDING, chatId)
+                Place.MODAL -> store.addPendingDelete(MODAL_PENDING, chatId)
+                else -> store.addPendingDelete(TENSORLAKE_PENDING, SandboxManager.nameFor(chatId))
+            }
         }
     }
 
@@ -401,6 +462,11 @@ class ChatService(
         if (hasBoxKey()) {
             for (chatId in store.takePendingDeletes(BOX_PENDING)) {
                 runCatching { boxes.delete(chatId) }.onFailure { store.addPendingDelete(BOX_PENDING, chatId) }
+            }
+        }
+        if (hasModalKey()) {
+            for (chatId in store.takePendingDeletes(MODAL_PENDING)) {
+                runCatching { modal.delete(chatId) }.onFailure { store.addPendingDelete(MODAL_PENDING, chatId) }
             }
         }
     }
@@ -504,10 +570,11 @@ class ChatService(
         }
     }
 
-    /** The chat whose sandbox the opencode plugin names: "phone:<chat>", "box:<chat>", or a Tensorlake sandbox name. */
+    /** The chat whose sandbox the opencode plugin names: "phone:<chat>", "box:<chat>", "modal:<chat>", or a Tensorlake sandbox name. */
     fun chatOfSandbox(sandbox: String): String? = when {
         sandbox.startsWith("phone:") -> sandbox.removePrefix("phone:").takeIf { store.exists(it) }
         sandbox.startsWith("box:") -> sandbox.removePrefix("box:").takeIf { store.exists(it) }
+        sandbox.startsWith("modal:") -> sandbox.removePrefix("modal:").takeIf { store.exists(it) }
         else -> store.list().map { it.getString("id") }.firstOrNull { SandboxManager.nameFor(it) == sandbox }
     }
 
@@ -645,6 +712,7 @@ class ChatService(
         /** Pending-delete lists for sandboxes whose deletion failed. */
         private const val TENSORLAKE_PENDING = "tensorlake"
         private const val BOX_PENDING = "box"
+        private const val MODAL_PENDING = "modal"
 
         /** `<zip> <dir>`: unpacks a moved workspace (python3, which every sandbox has). */
         private const val UNZIP = "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2]); import os; os.remove(sys.argv[1])"

@@ -1,10 +1,11 @@
 package dev.mokouliszt.poordsh.upstash
 
+import dev.mokouliszt.poordsh.sandbox.SandboxRunner
 import java.util.UUID
 
 /**
- * Runs commands in a box through `box-runner.sh` (next to this class in the
- * resources), so a box answers like a device jail's agent: output in files, so
+ * Runs commands in a box through [SandboxRunner]'s script, so a box answers like
+ * a device jail's agent: output in files, so
  * `cmd &` returns; 1 MiB per stream; exit 124 past the timeout. Box's gateway ends
  * a call after 300 s, so a command allowed longer than [CALL_MAX_SECS] runs apart
  * and is waited for over several calls of at most [WAIT_SECS].
@@ -16,10 +17,6 @@ object BoxRunner {
     const val WATCHDOG_SECS = 600
     private const val PENDING = "poordsh-runner: pending"
 
-    val SCRIPT: String by lazy {
-        BoxRunner::class.java.getResourceAsStream("box-runner.sh")?.use { it.readBytes().decodeToString() }
-            ?: error("box-runner.sh is missing from the app")
-    }
 
     /** Runs the shell [command] in [cwd] (created if missing) for at most [timeoutSecs]. */
     fun run(
@@ -51,9 +48,7 @@ object BoxRunner {
     fun isPending(r: BoxApi.Exec) = r.exitCode == 75 && r.stdout.isEmpty() && r.stderr.trim() == PENDING
 
     /** [command] and [args] as one shell command line. */
-    fun join(command: String, args: List<String>): String = (listOf(command) + args).joinToString(" ") { quote(it) }
+    fun join(command: String, args: List<String>): String = SandboxRunner.join(command, args)
 
-    fun quote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
-
-    private fun argv(vararg args: String) = listOf("sh", "-c", SCRIPT, "poordsh-runner") + args
+    private fun argv(vararg args: String) = listOf("sh", "-c", SandboxRunner.SCRIPT, "poordsh-runner") + args
 }

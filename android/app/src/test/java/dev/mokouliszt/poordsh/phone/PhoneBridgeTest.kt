@@ -86,6 +86,23 @@ class PhoneBridgeTest {
     }
 
     @Test
+    fun modalSandboxesGoToTheModalOperations() {
+        val seen = mutableListOf<Pair<String, String>>()
+        server.modal = object : PhoneOps {
+            override fun acquire(name: String, token: String) {}
+            override fun release(name: String, token: String) {}
+            override suspend fun op(name: String, request: JSONObject): JSONObject {
+                seen += name to request.getString("op")
+                return JSONObject().put("exitCode", 0).put("stdout", "from modal").put("stderr", "")
+            }
+        }
+        val (code, r) = post("/run", JSONObject().put("sandbox", "modal:c_9").put("chatId", "c_9").put("command", "true"))
+        assertEquals(200, code)
+        assertEquals("from modal", r.getString("stdout"))
+        assertEquals(listOf("c_9" to "run"), seen)
+    }
+
+    @Test
     fun refusesWithoutToken() {
         assertEquals(401, post("/run", JSONObject().put("chatId", "c").put("command", "true"), token = null).first)
         assertEquals(401, post("/run", JSONObject().put("chatId", "c").put("command", "true"), token = "wrong").first)

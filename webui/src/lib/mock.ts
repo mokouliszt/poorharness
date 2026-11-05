@@ -3,6 +3,7 @@
 // docs/bridge-protocol.md with canned data and a fake streaming reply.
 // URL flags: ?setup (first-run unpack),
 // ?loading (opencode still reporting its models), ?nokey (no Tensorlake key: chats run on the device),
+// ?modal (a Modal token is set: new chats start there), ?modalnear (Modal is past 80% of its budget),
 // ?box (an Upstash Box key is set: new chats start there), ?boxspent (Box's free CPU is used up this month),
 // ?nim (an NVIDIA NIM key is set), ?orca (an OrcaRouter key is set), ?infron (an Infron key is set), ?venice (a Venice key is set), ?ratelimit (a sent message waits for a
 // provider's daily limit), ?full (picked files do not fit in the sandbox),
@@ -54,12 +55,28 @@ export function createMockHost(emit: Emit) {
     subagentModel: flags.includes("submodel") ? "opencode:opencode/big-pickle" : null,
     subagentEffort: null,
     titleModel: flags.includes("titlemodel") ? "opencode:opencode/big-pickle" : null,
+    modalBudgetUsd: 30,
+    modalGpu: "T4",
   };
   const tensorlake = { keySet: !flags.includes("nokey") };
   const box = { keySet: flags.includes("box") || flags.includes("boxspent") };
   const boxSpent = flags.includes("boxspent");
-  // Where a new chat starts, as the host decides it (docs/adr/box-first.md).
-  const newPlace = () => (box.keySet && !boxSpent ? "box" : tensorlake.keySet ? "cloud" : "phone");
+  const modal = { keySet: flags.includes("modal") || flags.includes("modalnear") };
+  const modalSpentUsd = flags.includes("modalnear") ? 25.4 : 3.12;
+  // Modal's rates as `modal.usage` passes them on (November 2026).
+  const MODAL_GPUS = [
+    ["T4", 0.59], ["L4", 0.8], ["A10G", 1.1], ["L40S", 1.95], ["A100-40GB", 2.1], ["A100-80GB", 2.5],
+    ["RTX-PRO-6000", 3.03], ["H100", 3.95], ["H200", 4.54], ["B200", 6.25], ["B300", 7.1],
+  ].map(([id, usdPerHour]) => ({ id, usdPerHour }));
+  // Where a new chat starts, as the host decides it (docs/adr/modal-first.md).
+  const newPlace = () =>
+    modal.keySet && modalSpentUsd < settings.modalBudgetUsd * 0.8
+      ? "modal"
+      : box.keySet && !boxSpent
+        ? "box"
+        : tensorlake.keySet
+          ? "cloud"
+          : "phone";
   const tinyfish = { keySet: false };
   const keys: Record<string, boolean> = { opencode: false, nvidia: flags.includes("nim"), orcarouter: flags.includes("orca"), infron: flags.includes("infron"), venice: flags.includes("venice") };
   let enabledOptions: string[] = ["subagents", "prune"];
@@ -276,6 +293,7 @@ export function createMockHost(emit: Emit) {
     if (!c.place) c.place = newPlace();
     if (c.place === "cloud" && !tensorlake.keySet) throw new Error("tensorlake_key_missing");
     if (c.place === "box" && !box.keySet) throw new Error("box_key_missing");
+    if (c.place === "modal" && !modal.keySet) throw new Error("modal_key_missing");
     const engine = model.split(":")[0];
     const files = ids.map((id) => picked[id]).filter(Boolean);
     if (!c.title) c.title = (text.split("\n")[0] || files[0]?.name || "").slice(0, 60);
@@ -590,6 +608,7 @@ export function createMockHost(emit: Emit) {
       case "accounts.get":
         return {
           opencode: { keys: Object.keys(keys).filter((k) => keys[k]), state: runtime.backends.opencode },
+          modal,
           box,
           tensorlake,
           tinyfish,
@@ -624,6 +643,30 @@ export function createMockHost(emit: Emit) {
         box.keySet = !!p.key;
         emit({ type: "account.changed", backend: "box" });
         return null;
+      case "modal.set":
+        // Like the host: the first token installs Modal's tools before it is checked.
+        if (p.key && !modal.keySet) {
+          emit({ type: "key.progress", provider: "modal", stage: "installing" });
+          await sleep(2500);
+        }
+        await sleep(500);
+        if (p.key && !/ak-\w+/.test(p.key)) throw new Error("modal_key_invalid");
+        modal.keySet = !!p.key;
+        emit({ type: "account.changed", backend: "modal" });
+        return null;
+      case "modal.usage":
+        await sleep(400);
+        return modal.keySet
+          ? { month: "2026-11", spentUsd: modalSpentUsd, budgetUsd: settings.modalBudgetUsd, spent: false, gpus: MODAL_GPUS }
+          : null;
+      case "chat.setGpu": {
+        const c = chats.find((x) => x.id === p.sessionId);
+        if (c) {
+          c.gpu = !!p.on;
+          emit({ type: "sessions.upsert", session: meta(c) });
+        }
+        return null;
+      }
       case "box.usage":
         await sleep(300);
         return box.keySet ? { month: "2026-11", usedHours: boxSpent ? 5 : 0.4, freeHours: 5, spent: boxSpent } : null;

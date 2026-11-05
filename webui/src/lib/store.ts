@@ -12,6 +12,7 @@ import type {
   EngineOption,
   Listed,
   Message,
+  ModalUsage,
   ModelInfo,
   Part,
   RuntimeState,
@@ -86,6 +87,11 @@ interface State {
   keySheet: boolean;
   /** The Upstash Box API key sheet. */
   boxSheet: boolean;
+  /** The Modal token sheet (no token yet), and the budget and GPU sheet (a token set). */
+  modalKeySheet: boolean;
+  modalSheet: boolean;
+  /** This month's Modal cost and its GPUs; null until read. */
+  modalUsage: ModalUsage | null;
   /** The engine options sheet. */
   optionsSheet: boolean;
   /** The API key sheet for an opencode provider, if open. */
@@ -149,6 +155,9 @@ const initial: State = {
   titleSheet: false,
   keySheet: false,
   boxSheet: false,
+  modalKeySheet: false,
+  modalSheet: false,
+  modalUsage: null,
   optionsSheet: false,
   providerKeySheet: null,
   tinyfishSheet: false,
@@ -225,6 +234,10 @@ export function pop(): boolean {
     set({ boxSheet: false });
     return true;
   }
+  if (s.modalKeySheet || s.modalSheet) {
+    set({ modalKeySheet: false, modalSheet: false });
+    return true;
+  }
   if (s.optionsSheet) {
     set({ optionsSheet: false });
     return true;
@@ -266,6 +279,32 @@ export function setBoxSheet(open: boolean) {
   set({ boxSheet: open });
 }
 
+/** With a token, new chats start in Modal while the month's budget lasts. */
+export const hasModalKey = (s: State) => !!s.accounts?.modal?.keySet;
+
+export function setModalKeySheet(open: boolean) {
+  set({ modalKeySheet: open });
+}
+
+export function setModalSheet(open: boolean) {
+  set({ modalSheet: open });
+}
+
+/** Reads this month's Modal cost and GPUs; [refresh] asks Modal rather than the host's few-minute copy. */
+export async function loadModalUsage(refresh = false) {
+  try {
+    set({ modalUsage: await call<ModalUsage | null>("modal.usage", { refresh }) });
+  } catch {
+    /* shown as unknown */
+  }
+}
+
+/** A GPU for this chat's Modal sandbox, from its next message. */
+export async function setChatGpu(sessionId: string, on: boolean) {
+  await call("chat.setGpu", { sessionId, on });
+  set((s) => ({ sessions: s.sessions.map((x) => (x.id === sessionId ? { ...x, gpu: on } : x)) }));
+}
+
 export const hasTinyfishKey = (s: State) => !!s.accounts?.tinyfish?.keySet;
 
 export function setTinyfishSheet(open: boolean) {
@@ -289,7 +328,7 @@ export function takePickerOpenGroup(): string | null {
   return g;
 }
 
-export type KeyStage = "checking" | "starting" | "saving" | "models";
+export type KeyStage = "checking" | "installing" | "starting" | "saving" | "models";
 
 export function setKeyStage(stage: KeyStage | null) {
   set({ keyStage: stage });

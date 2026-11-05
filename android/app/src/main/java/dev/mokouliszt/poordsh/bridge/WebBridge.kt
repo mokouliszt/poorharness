@@ -33,6 +33,7 @@ import dev.mokouliszt.poordsh.storage.S3Storage
 import dev.mokouliszt.poordsh.sandbox.CloudSandboxes
 import dev.mokouliszt.poordsh.tensorlake.SandboxManager.Companion.WORKSPACE
 import dev.mokouliszt.poordsh.tensorlake.TensorlakeApi
+import dev.mokouliszt.poordsh.modal.ModalAgent
 import dev.mokouliszt.poordsh.upstash.BoxApi
 import dev.mokouliszt.poordsh.upstash.BoxSandboxes
 import dev.mokouliszt.poordsh.web.TinyFish
@@ -229,6 +230,7 @@ class WebBridge(
                 )
             },
             "tensorlake" to jsonOf("keySet" to graph.secrets.has(SecretStore.TENSORLAKE_API_KEY)),
+            "modal" to jsonOf("keySet" to graph.hasModalKey()),
             "box" to jsonOf("keySet" to graph.secrets.has(SecretStore.UPSTASH_BOX_API_KEY)),
             "tinyfish" to jsonOf("keySet" to graph.secrets.has(SecretStore.TINYFISH_API_KEY)),
         )
@@ -301,6 +303,43 @@ class WebBridge(
                 jsonOf("month" to it.month, "usedHours" to it.usedHours, "freeHours" to it.freeHours, "spent" to it.spent)
             }
         }
+
+        // The Modal token, pasted as Modal shows it (`modal token set --token-id ak-… --token-secret as-…`).
+        "modal.set" -> {
+            val text = p.str("key")?.trim()?.takeIf { it.isNotEmpty() }
+            val token = text?.let { ModalAgent.Token.parse(it) ?: throw IOException("modal_key_invalid") }
+            if (token != null) {
+                // Checked before it is kept; the first token installs Modal's SDK in the app's Ubuntu.
+                try {
+                    graph.modalAgent.check(token) {
+                        EventBus.emit("key.progress", jsonOf("provider" to "modal", "stage" to "installing"))
+                    }
+                } catch (e: ModalAgent.ModalException) {
+                    if (e.kind == "auth") throw IOException("modal_key_invalid")
+                    throw e
+                }
+            } else {
+                graph.modalAgent.stop()
+            }
+            // The app reads the token at each start of its helper (opencode never sees it): nothing to restart.
+            graph.secrets.put(SecretStore.MODAL_TOKEN, token?.toJson()?.toString())
+            EventBus.emit("account.changed", jsonOf("backend" to "modal"))
+            null
+        }
+        // This month's Modal cost against the budget, and the GPUs with their prices (docs/adr/modal-first.md).
+        "modal.usage" -> {
+            if (!graph.hasModalKey()) null
+            else graph.modal.usage(refresh = p.optBoolean("refresh")).let { u ->
+                jsonOf(
+                    "month" to u.month,
+                    "spentUsd" to u.spentUsd,
+                    "budgetUsd" to u.budgetUsd,
+                    "spent" to u.spent,
+                    "gpus" to JSONArray().apply { u.gpus.forEach { put(jsonOf("id" to it.id, "usdPerHour" to it.usdPerHour)) } },
+                )
+            }
+        }
+        "chat.setGpu" -> { graph.chats.setGpu(p.getString("sessionId"), p.getBoolean("on")); null }
 
         "tinyfish.set" -> {
             val key = p.str("key")?.trim()?.takeIf { it.isNotEmpty() }
@@ -521,6 +560,16 @@ class WebBridge(
                     graph.opencode.applySystemPrompt()
                 }
             }
+            if (p.has("modalBudgetUsd")) {
+                val usd = p.optDouble("modalBudgetUsd")
+                if (usd.isNaN() || usd <= 0 || usd > 100_000) throw IllegalArgumentException("modal_budget_invalid")
+                if (usd != graph.settings.modalBudgetUsd) {
+                    graph.settings.modalBudgetUsd = usd
+                    graph.modal.budgetChanged()
+                }
+            }
+            // A GPU id from `modal.usage`; Modal checks it when a sandbox asks for it.
+            if (p.has("modalGpu")) p.str("modalGpu")?.trim()?.takeIf { it.isNotEmpty() }?.let { graph.settings.modalGpu = it }
             if (p.has("autoUpdate")) {
                 val on = p.optBoolean("autoUpdate")
                 val turnedOn = on && !graph.settings.autoUpdateEngines

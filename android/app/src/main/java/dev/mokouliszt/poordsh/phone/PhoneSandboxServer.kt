@@ -51,6 +51,9 @@ class PhoneSandboxServer(
     /** The operations for "box:<chat>" sandboxes (docs/adr/box-first.md); null when Upstash Box is not wired. */
     @Volatile var box: PhoneOps? = null
 
+    /** The operations for "modal:<chat>" sandboxes (docs/adr/modal-first.md); null when Modal is not wired. */
+    @Volatile var modal: PhoneOps? = null
+
     private var server: ServerSocket? = null
     private var endpoint: Endpoint? = null
     private val pool = Executors.newCachedThreadPool { r -> Thread(r, "phone-http").apply { isDaemon = true } }
@@ -115,7 +118,11 @@ class PhoneSandboxServer(
         }
         // "sandbox" names the place ("phone:<chat>" or "box:<chat>"); a bare chatId is a jail.
         val sandbox = body.optString("sandbox")
-        val ops = if (sandbox.startsWith(BOX_PREFIX)) box ?: throw IOException("Upstash Box is not available") else sandboxes
+        val ops = when {
+            sandbox.startsWith(BOX_PREFIX) -> box ?: throw IOException("Upstash Box is not available")
+            sandbox.startsWith(MODAL_PREFIX) -> modal ?: throw IOException("Modal is not available")
+            else -> sandboxes
+        }
         val chat = sandbox.substringAfter(':', "").ifBlank { body.optString("chatId") }.ifBlank { throw IOException("chatId required") }
         val token = "op:" + UUID.randomUUID()
         ops.acquire(chat, token)
@@ -196,6 +203,7 @@ class PhoneSandboxServer(
 
     companion object {
         const val BOX_PREFIX = "box:"
+        const val MODAL_PREFIX = "modal:"
 
         private fun randomHex(bytes: Int): String {
             val b = ByteArray(bytes)

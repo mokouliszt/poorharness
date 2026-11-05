@@ -10,7 +10,7 @@ import java.io.File
 import java.nio.file.Files
 
 /**
- * box-runner.sh through BoxApi, run on the build host by [FakeBox]: the replies a
+ * runner.sh through BoxApi, run on the build host by [FakeBox]: the replies a
  * device jail's agent gives, and commands longer than one gateway call.
  */
 class BoxRunnerTest {
@@ -22,7 +22,7 @@ class BoxRunnerTest {
     @Before
     fun setUp() {
         assumeTrue(File("/usr/bin/timeout").canExecute() && File("/usr/bin/setsid").canExecute())
-        dir = Files.createTempDirectory("box-runner").toFile()
+        dir = Files.createTempDirectory("runner").toFile()
         box.stateDir = File(dir, "state")
         id = api.create("poordsh-test", listOf("poordsh")).id
     }

@@ -22,6 +22,7 @@ const EMPTY: Message[] = [];
 
 const STAGES: Record<string, TKey> = {
   sandbox: "stage.sandbox",
+  tools: "stage.tools",
   room: "stage.room",
   move: "stage.move",
   upload: "stage.upload",
@@ -163,7 +164,7 @@ export function Chat({ sessionId }: { sessionId: string }) {
         }}
       />
       <ModelSheet />
-      <OptionsSheet />
+      <OptionsSheet sessionId={sessionId} />
       <ModelSheet target="subagent" />
       <ModelSheet target="title" />
       <ApprovalSheet sessionId={sessionId} />
