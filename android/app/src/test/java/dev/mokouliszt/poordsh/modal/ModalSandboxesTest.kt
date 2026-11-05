@@ -11,6 +11,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.json.JSONObject
 import java.io.File
 import java.nio.file.Files
 
@@ -51,10 +52,11 @@ class ModalSandboxesTest {
         assertEquals("c_1", b.tags.getString("chat"))
         assertEquals("", b.tags.getString("gpu"))
         assertFalse(b.args.has("gpu"))
-        // Billed at max(request, use): a small request, a ceiling, and Modal's own stops.
+        // Billed at max(request, use): Modal's least as the request, its most as the limit, and its own stops.
         assertEquals(0.125, b.args.getJSONArray("cpu").getDouble(0), 0.0)
-        assertEquals(2.0, b.args.getJSONArray("cpu").getDouble(1), 0.0)
-        assertEquals(4096, b.args.getJSONArray("memory").getInt(1))
+        assertEquals(64.0, b.args.getJSONArray("cpu").getDouble(1), 0.0)
+        assertEquals(128, b.args.getJSONArray("memory").getInt(0))
+        assertEquals(344064, b.args.getJSONArray("memory").getInt(1))
         assertEquals(ModalSandboxes.CPU.idleSecs, b.args.getInt("idleTimeout"))
         assertEquals(ModalSandboxes.CPU.lifetimeSecs, b.args.getInt("timeout"))
         // A second use keeps it.
@@ -215,6 +217,68 @@ class ModalSandboxesTest {
         assertEquals(1, modal.ops("snapshot").size)
         // Its snapshot is the chat's now.
         assertFalse(s.ensure("c_mine").fresh)
+    }
+
+    @Test
+    fun theBoundsFollowModalAndAreReadOncePerWeek() = runBlocking {
+        modal.bounds = JSONObject().put("cpuMin", 0.25).put("cpuMax", 96.0).put("memMin", 256).put("memMax", 500000)
+        modal.acceptCpuFrom = 0.25
+        sandboxes().ensure("c_1")
+        val start = modal.ops("start").last()
+        assertEquals(listOf(0.25, 96.0), (0..1).map { start.getJSONArray("cpu").getDouble(it) })
+        assertEquals(listOf(256, 500000), (0..1).map { start.getJSONArray("memory").getInt(it) })
+        // Kept: another start, even after a restart of the app, does not ask again.
+        sandboxes().ensure("c_2")
+        assertEquals(1, modal.ops("bounds").size)
+    }
+
+    @Test
+    fun aRefusedBoundIsReadAgainAndTheStartRetried() = runBlocking {
+        val s = sandboxes()
+        s.ensure("c_1")
+        // Modal raised its minimum since the bounds were read.
+        modal.bounds = JSONObject().put("cpuMin", 0.25).put("cpuMax", 64.0).put("memMin", 128).put("memMax", 344064)
+        modal.acceptCpuFrom = 0.25
+        s.ensure("c_2")
+        assertEquals(2, modal.ops("bounds").size)
+        assertEquals(0.25, modal.ops("start").last().getJSONArray("cpu").getDouble(0), 0.0)
+        assertNotNull(modal.byName("poordsh-c-2"))
+    }
+
+    @Test
+    fun whatASandboxReallyUsesIsCountedAndTheBudgetStopsIt() = runBlocking {
+        val s = sandboxes(heartbeatMs = 40)
+        budget = 5.0
+        s.usage()
+        s.acquire("c_1", "t")
+        val id = s.ensure("c_1").sandbox.id
+        // 60 core-hours of CPU (about $8.50 at $0.1419) between two readings.
+        modal.cpuNs[id] = 60L * 3600 * 1_000_000_000
+        until("the stop") { modal.byName("poordsh-c-1") == null }
+        assertTrue(s.usage(refresh = true).spentUsd > 5.0)
+        assertFalse(s.allowsNewChats())
+        assertTrue(s.shouldLeave())
+        // Nothing starts again this month, except to copy the chat's files out.
+        val e = assertThrows(ModalAgent.ModalException::class.java) { runBlocking { s.ensure("c_1") } }
+        assertEquals("usage", e.kind)
+        val starts = modal.ops("start").size
+        s.downloadWorkspace("c_1", File(dir, "out"))
+        assertEquals(starts + 1, modal.ops("start").size)
+        s.release("c_1", "t")
+    }
+
+    @Test
+    fun memoryInUseCountsAboveTheRequest() = runBlocking {
+        val s = sandboxes(heartbeatMs = 40)
+        s.usage()
+        s.acquire("c_1", "t")
+        val id = s.ensure("c_1").sandbox.id
+        val idle = s.usage(refresh = true).spentUsd
+        modal.memBytes[id] = 300L shl 30
+        Thread.sleep(600)
+        // 300 GiB at $0.024 an hour is about $0.0012 in 0.6 s; the 128 MiB request alone, a two-thousandth of that.
+        assertTrue(s.usage(refresh = true).spentUsd - idle > 0.0008)
+        s.release("c_1", "t")
     }
 
     @Test

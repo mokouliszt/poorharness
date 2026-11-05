@@ -16,8 +16,8 @@ android {
         applicationId = "dev.mokouliszt.poordsh"
         minSdk = 26
         targetSdk = 36
-        versionCode = 31
-        versionName = "0.20.0"
+        versionCode = 32
+        versionName = "0.20.1"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
 

@@ -1,6 +1,6 @@
 # Modal first, then Upstash Box, Tensorlake and the device
 
-Status: accepted (2026-11, 0.20.0)
+Status: accepted (2026-11, 0.20.0; sandboxes sized to Modal's bounds in 0.20.1)
 
 ## Context
 
@@ -27,7 +27,16 @@ SDK 1.6.3:
   name fails at once without cost;
 - `Workspace.billing.summary()` gives the month's metered cost on Starter,
   some minutes behind;
-- a name can be used again only after `terminate(wait=True)`.
+- a name can be used again only after `terminate(wait=True)`;
+- a sandbox may ask for 0.125 to 64 CPU cores and 128 to 344064 MiB; Modal says
+  so only when refusing a request (`CPU request must be >= 125 mCPU`, `<= 64000
+  mCPU`, `memory request must be >= 128 MiB`, `<= 344064 MiB`), and does not
+  check limits at all (one of 10000 cores was taken). The default limits are
+  the request plus 16 cores and no memory cap;
+- inside, a sandbox asking for 0.125 cores and allowed 64 sees `nproc` 1 but 64
+  CPUs (`os.cpu_count()`; 43 on a T4 host), and 8 busy loops got 7.9 cores; its
+  cgroup v1 counters are readable: `cpuacct/cpuacct.usage` (CPU ns since it
+  started) and `memory/memory.usage_in_bytes` (memory in use).
 
 How Modal refuses work once a spend limit or the credits are used up is not
 documented and was not observed: the test account's credits were not spent on
@@ -59,10 +68,14 @@ what Modal keeps working.
 **One sandbox per chat** (`modal/ModalSandboxes.kt`), in the Modal App
 `poorharness`, named `poordsh-<chat id>` and tagged `poordsh=1`, `chat` and
 `gpu`; Modal's Debian image with git, curl, zip, unzip, procps and ripgrep;
-workspace `/tmp/workspace` as everywhere. A CPU sandbox asks for 0.125 of a
-core and 256 MiB and may use up to 2 cores and 4 GiB; Modal ends it after 6
-hours, or 5 minutes without a command. Commands run through
-`sandbox/runner.sh`, as in a box.
+workspace `/tmp/workspace` as everywhere. Every sandbox asks for the least CPU
+and memory Modal allows and may use up to the most it allows (0.125 to 64 cores,
+128 MiB to 336 GiB in November 2026). The app reads those bounds from Modal's
+refusals once a week (`bounds` in the helper), and again when Modal refuses a
+start for them, so a change at Modal needs no new release; without an answer it
+uses the values above. A CPU sandbox is ended by Modal after 6 hours, or 5
+minutes without a command. Commands run through `sandbox/runner.sh`, as in a
+box.
 
 **Between uses, a snapshot.** Modal sandboxes do not pause. When a chat lets
 go of its sandbox, the app snapshots its filesystem at once and stops it 60 s
@@ -70,16 +83,17 @@ later; the next use starts a sandbox from the snapshot, with every file. A new
 snapshot replaces the chat's last one; they expire 30 days after they were
 made and are deleted with the chat. A chat whose snapshot is gone starts empty,
 and the conversation is handed over as for an expired Tensorlake sandbox. While
-a chat holds its sandbox, the app runs an empty command every 50 s, so a long
-think or an open question does not hit the idle stop; once the phone is gone,
+a chat holds its sandbox, the app runs a command every 50 s, so a long think or
+an open question does not hit the idle stop (the same command reads its CPU time
+and memory for the budget, below); once the phone is gone,
 the idle stop ends the sandbox. When the app starts, sandboxes of this phone's
 chats that a killed app left running are snapshotted and stopped; those of
 chats this phone does not have are left alone.
 
 **GPU.** Off unless a chat turns it on (its options sheet); the GPU type is
-chosen in Settings from Modal's rates, T4 by default. A GPU sandbox asks for
-0.5 of a core and 2 GiB, may use 4 cores and 16 GiB, and Modal ends it after 2
-hours or 2 minutes without a command. Turning the GPU on or off takes a snapshot
+chosen in Settings from Modal's rates, T4 by default. A GPU sandbox has the
+same CPU and memory bounds, and Modal ends it after 2 hours or 2 minutes
+without a command. Turning the GPU on or off takes a snapshot
 and starts the sandbox again. A GPU is not started without half an hour of it
 left under 95% of the budget (`modal_gpu_budget`). A held GPU sandbox that no
 tool has used for 10 minutes is snapshotted and stopped, and the next tool call
@@ -87,10 +101,14 @@ starts it again.
 
 **The budget.** This month's cost is the larger of Modal's billing summary
 (read at most every 5 minutes, and on each chat's first message) and the app's
-own count: each sandbox's running time at what it asked for, at Modal's rates
-(`files/modal-state.json`). Under 80% of the budget new chats start in Modal;
+own count (`files/modal-state.json`), which bills as Modal does: between two
+readings of a sandbox, the CPU it used and the larger of its memory then and
+now, each at least the request, plus its GPU, at Modal's rates; time not read
+yet counts at the request. Under 80% of the budget new chats start in Modal;
 from 95% a `modal` chat moves on at its next message, while its files can still
-be copied out. Any refusal that reads as usage (`ResourceExhaustedError`, or
+be copied out. At 100% a held sandbox is snapshotted and stopped at its next
+reading, even mid-turn, and nothing starts in Modal for the month except to copy
+a chat's files out. Any refusal that reads as usage (`ResourceExhaustedError`, or
 words about billing, credits, spend, quotas or limits) counts as the month
 spent: chats move on, and a tool call refused mid-turn tells the model to have
 the user send the message again. Changing the budget in Settings clears that
@@ -110,9 +128,16 @@ not set yet.
   one switch away. Processes end when a chat lets go, as with Box.
 - The first token takes a minute or two to install Modal's SDK (tens of MB),
   and a Python process runs on the phone while Modal sandboxes are up.
-- The app's count covers what sandboxes asked for, not what they used beyond
-  it, and Modal's summary lags: a heavy GPU turn can pass 95% before the app
-  sees it. Modal's own spend limit is what really caps the bill.
+- A sandbox can use far more than a phone-sized job needs: a tool that starts a
+  worker per CPU (`os.cpu_count()` is 64) can run 64 cores, about $9 an hour,
+  and memory is capped only by Modal's largest sandbox. `nproc` stays 1, so
+  `make -j$(nproc)` and the like stay small.
+- The app reads usage every 50 s and memory only at those moments, so a burst
+  between readings is caught by CPU time but not by memory, and up to 50 s of
+  running past the budget is possible; Modal's summary lags by minutes. Modal's
+  own spend limit is what really caps the bill.
+- Modal's bounds come from the wording of its refusals; if that changes, the
+  app falls back to the last values read, then to those above.
 - The usage refusal is recognized by guesswork; a misread one moves a chat out
   early. When a real one is seen, `poordsh-modal.py` (`kind`) and this file
   should say what it looks like.

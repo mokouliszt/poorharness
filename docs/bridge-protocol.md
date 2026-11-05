@@ -44,13 +44,16 @@ Named `poordsh-<chat id>` (`ModalSandboxes.nameFor`) in the Modal App
 Modal's Python SDK in its own Ubuntu (`assets/modal/poordsh-modal.py`), so the
 token stays in the app.
 
-- Started on the chat's first message (a slice of a core and 256 MiB, up to 2
-  cores and 4 GiB; with the chat's GPU on, the GPU set in Settings, up to 4
-  cores and 16 GiB). Snapshotted when the chat lets go and stopped 60 s later;
+- Started on the chat's first message, asking for the least CPU and memory
+  Modal allows and allowed up to the most (0.125 to 64 cores, 128 MiB to
+  336 GiB; read from Modal weekly); with the chat's GPU on, also the GPU set in
+  Settings. Snapshotted when the chat lets go and stopped 60 s later;
   the next use starts from the snapshot with every file. Snapshots expire after
   30 days; the sandbox and its snapshot are deleted with the chat.
-- A held sandbox gets an empty command every 50 s, so Modal's idle stop (5
-  minutes, 2 with a GPU) ends it only once the phone is gone; a held GPU no tool
+- A held sandbox gets a command every 50 s, which also reads its CPU time and
+  memory for the month's count, so Modal's idle stop (5 minutes, 2 with a GPU)
+  ends it only once the phone is gone; at 100% of the budget it is saved and
+  stopped then, mid-turn too; a held GPU no tool
   has used for 10 minutes is saved and stopped. Sandboxes of this phone's chats
   left running by a killed app are saved and stopped at start.
 - New chats start here under 80% of the month's budget; from 95%, or once Modal

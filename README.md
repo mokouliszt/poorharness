@@ -171,10 +171,12 @@ start. Optional:
 - On Tensorlake's free plan only one cloud chat works at a time; starting
   another pauses sandboxes that are idle, and waits if the other chat is still
   working.
-- **Set a spend limit in Modal too.** The app counts what its sandboxes ask
-  for and reads Modal's bill, which lags by minutes, so a heavy GPU turn can go
-  past the budget before the app sees it. Modal's own limit is what really caps
-  the bill. Programs in a Modal sandbox stop a minute after the turn ends (the
+- **Set a spend limit in Modal too.** A Modal sandbox asks for Modal's
+  smallest share of CPU and memory and may grow to its largest (64 cores,
+  336 GiB), billed as used. The app reads each sandbox's use every 50 s, adds
+  Modal's bill (which lags by minutes) and stops sandboxes at the budget, but a
+  burst between readings can still pass it. Modal's own limit is what really
+  caps the bill. Programs in a Modal sandbox stop a minute after the turn ends (the
   files stay). If the app is killed or the phone goes offline, Modal stops the
   sandbox within 5 minutes (2 with a GPU).
 - **Programs in a box stop when it pauses**, a minute after the turn ends (the

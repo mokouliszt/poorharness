@@ -30,6 +30,11 @@ import java.util.zip.ZipInputStream
  * left without commands for [CPU.idleSecs] or [GPU.idleSecs] and any after its
  * lifetime, so a phone that dies cannot leave one running.
  *
+ * Each sandbox asks for the least CPU and memory Modal allows and may use up to
+ * the most it allows ([Bounds], read from Modal once a week). Modal bills the
+ * larger of request and use, so the app reads each held sandbox's CPU time and
+ * memory as it goes ([meter]) and stops it once the month's budget is reached.
+ *
  * A chat with [gpuFor] on gets a GPU of [gpuType]; switching takes a snapshot
  * and starts the sandbox again with or without it. New chats start here while
  * this month's cost is under [NEW_CHAT_SHARE] of [budgetUsd]; past [LEAVE_SHARE]
@@ -52,10 +57,21 @@ class ModalSandboxes(
     data class Gpu(val id: String, val usdPerHour: Double)
     data class Usage(val month: String, val spentUsd: Double, val budgetUsd: Double, val spent: Boolean, val gpus: List<Gpu>)
 
-    /** What a sandbox asks Modal for: CPU cores and MiB as (request, limit); billed at the larger of request and use. */
-    data class Shape(val cpu: Pair<Double, Double>, val memoryMiB: Pair<Int, Int>, val lifetimeSecs: Int, val idleSecs: Int)
+    /** How long Modal lets a sandbox run, and how long without a command before it stops it. */
+    data class Shape(val lifetimeSecs: Int, val idleSecs: Int)
 
-    private data class Up(val id: String, val gpu: String, val since: Long)
+    /** The least and most CPU (cores) and memory (MiB) Modal lets a sandbox ask for. */
+    data class Bounds(val cpuMin: Double, val cpuMax: Double, val memMinMiB: Int, val memMaxMiB: Int)
+
+    /**
+     * A running sandbox. Its cost is counted into the month up to [countedUntil]:
+     * from its CPU time ([cpuNs], cumulative, when it was read) and memory in use,
+     * and at its request for whatever has not been read.
+     */
+    private class Up(val id: String, val gpu: String, since: Long, @Volatile var cpuNs: Long?) {
+        @Volatile var countedUntil: Long = since
+        @Volatile var memBytes: Long = 0
+    }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val locks = ConcurrentHashMap<String, Mutex>()
@@ -68,6 +84,8 @@ class ModalSandboxes(
     private val heartbeats = ConcurrentHashMap<String, Job>()
     /** When each sandbox was last used for a tool call or a check. */
     private val used = ConcurrentHashMap<String, Long>()
+    /** Sandboxes started only to copy a chat's files out, which the budget does not stop. */
+    private val moving = ConcurrentHashMap.newKeySet<String>()
     @Volatile private var usageCache: Pair<Long, Usage>? = null
     @Volatile private var rates: Map<String, Double> = emptyMap()
 
@@ -105,7 +123,13 @@ class ModalSandboxes(
                         .onSuccess { log.add("$name: GPU unused for a while; saved and stopped") }
                     continue
                 }
-                runCatching { agent.call("touch", JSONObject().put("sandbox", u.id), TOUCH_TIMEOUT_MS) }
+                touch(u)
+                if (overBudget()) {
+                    // A turn ran past the month's budget: saved and stopped now, not at its end.
+                    runCatching { lock(name).withLock { if (up[name] == u) stopLocked(name, snapshot = true) } }
+                    log.add("$name: this month's Modal budget is used up; saved and stopped")
+                    markSpent()
+                }
             }
         } finally {
             heartbeats.remove(name)
@@ -143,6 +167,8 @@ class ModalSandboxes(
     }
 
     private suspend fun ensureLocked(chatId: String, name: String): CloudSandboxes.Ready {
+        // Past the budget nothing starts, except to copy a chat's files out.
+        if (name !in moving && overBudget()) throw ModalException("usage", "this month's Modal budget is used up")
         val want = if (gpuFor(chatId)) gpuType() else ""
         var u = up[name]?.takeIf { runCatching { agent.call("running", JSONObject().put("sandbox", it.id)).optBoolean("running") }.getOrDefault(false) }
         if (u == null) {
@@ -168,7 +194,7 @@ class ModalSandboxes(
                 start(chatId, name, null, want)
             }
             fresh = image == null || imageOf(name) == null
-            u = Up(id, want, System.currentTimeMillis())
+            u = Up(id, want, System.currentTimeMillis(), cpuNs = 0L)
             up[name] = u
             log.add("$name: ${if (fresh) "started" else "restored"}${if (want.isNotEmpty()) " with $want" else ""}")
         }
@@ -193,28 +219,96 @@ class ModalSandboxes(
     private suspend fun find(name: String): Up? {
         val r = agent.call("find", JSONObject().put("name", name))
         val id = r.optString("sandbox").takeIf { !r.isNull("sandbox") && it.isNotBlank() } ?: return null
-        return Up(id, r.optJSONObject("tags")?.optString("gpu").orEmpty(), System.currentTimeMillis())
+        return Up(id, r.optJSONObject("tags")?.optString("gpu").orEmpty(), System.currentTimeMillis(), cpuNs = null)
     }
 
-    private suspend fun start(chatId: String, name: String, image: String?, gpu: String): String {
+    private suspend fun start(chatId: String, name: String, image: String?, gpu: String, retried: Boolean = false): String {
         val shape = if (gpu.isEmpty()) CPU else GPU
+        val b = bounds(refresh = retried)
         val args = JSONObject()
             .put("name", name)
             .put("tags", JSONObject().put(TAG, "1").put("chat", chatId).put("gpu", gpu))
             .put("timeout", shape.lifetimeSecs)
             .put("idleTimeout", shape.idleSecs)
             .put("workdir", WORKSPACE)
-            .put("cpu", org.json.JSONArray(listOf(shape.cpu.first, shape.cpu.second)))
-            .put("memory", org.json.JSONArray(listOf(shape.memoryMiB.first, shape.memoryMiB.second)))
+            .put("cpu", org.json.JSONArray(listOf(b.cpuMin, b.cpuMax)))
+            .put("memory", org.json.JSONArray(listOf(b.memMinMiB, b.memMaxMiB)))
         image?.let { args.put("image", it) }
         if (gpu.isNotEmpty()) args.put("gpu", gpu)
         return try {
             agent.call("start", args).getString("sandbox")
         } catch (e: ModalException) {
-            // Started a moment ago by another call for the same chat.
-            if (e.kind == "exists") find(name)?.id ?: throw e else throw e
+            when {
+                // Started a moment ago by another call for the same chat.
+                e.kind == "exists" -> find(name)?.id ?: throw e
+                // Modal changed its bounds: read them again and ask once more.
+                e.kind == "invalid" && !retried && e.message.orEmpty().contains("request must be") ->
+                    start(chatId, name, image, gpu, retried = true)
+                else -> throw e
+            }
         }
     }
+
+    /**
+     * Modal's bounds for a sandbox's CPU and memory: as last read (at most a week
+     * ago, or now with [refresh]), else as checked in November 2026.
+     */
+    private suspend fun bounds(refresh: Boolean = false): Bounds {
+        val saved = state().optJSONObject("bounds")
+        val recent = saved != null && System.currentTimeMillis() - saved.optLong("at") < BOUNDS_TTL_MS
+        if (saved != null && recent && !refresh) return boundsOf(saved)
+        val read = runCatching { agent.call("bounds") }.onFailure { log.add("Modal's bounds not read: ${it.message}") }.getOrNull()
+        if (read == null || !read.has("cpuMin") && !read.has("cpuMax") && !read.has("memMin") && !read.has("memMax")) {
+            return saved?.let { boundsOf(it) } ?: DEFAULT_BOUNDS
+        }
+        val b = boundsOf(read)
+        editState {
+            it.put(
+                "bounds",
+                JSONObject().put("cpuMin", b.cpuMin).put("cpuMax", b.cpuMax).put("memMin", b.memMinMiB).put("memMax", b.memMaxMiB)
+                    .put("at", System.currentTimeMillis()),
+            )
+        }
+        if (b != DEFAULT_BOUNDS) log.add("Modal's bounds: $b")
+        return b
+    }
+
+    /** Bounds from Modal's reply or the saved copy; any part missing is the default, and nonsense is ignored. */
+    private fun boundsOf(o: JSONObject): Bounds {
+        val d = DEFAULT_BOUNDS
+        val b = Bounds(o.optDouble("cpuMin", d.cpuMin), o.optDouble("cpuMax", d.cpuMax), o.optInt("memMin", d.memMinMiB), o.optInt("memMax", d.memMaxMiB))
+        val sane = b.cpuMin > 0 && b.cpuMin <= b.cpuMax && b.memMinMiB > 0 && b.memMinMiB <= b.memMaxMiB
+        return if (sane) b else d
+    }
+
+    private fun savedBounds(): Bounds = state().optJSONObject("bounds")?.let { boundsOf(it) } ?: DEFAULT_BOUNDS
+
+    /** Runs an empty command in [u] (Modal's idle stop counts from it) and counts what it used since the last one. */
+    private suspend fun touch(u: Up) {
+        val r = runCatching { agent.call("touch", JSONObject().put("sandbox", u.id), TOUCH_TIMEOUT_MS) }.getOrNull() ?: return
+        meter(u, if (r.has("cpuNs")) r.optLong("cpuNs") else null, if (r.has("memBytes")) r.optLong("memBytes") else null)
+    }
+
+    /**
+     * Counts [u]'s cost since it was last counted into the month: the CPU it used
+     * over that stretch (its request when a reading is missing), and the larger of
+     * its memory now and at the last reading, each at least its request.
+     */
+    private fun meter(u: Up, cpuNs: Long?, memBytes: Long?, now: Long = System.currentTimeMillis()) {
+        val ms = now - u.countedUntil
+        if (ms > 0 && rates.isNotEmpty()) {
+            val b = savedBounds()
+            val before = u.cpuNs
+            val cores = if (cpuNs != null && before != null && cpuNs >= before) maxOf(b.cpuMin, (cpuNs - before) / 1e6 / ms) else b.cpuMin
+            val memGiB = maxOf(b.memMinMiB / 1024.0, maxOf(u.memBytes, memBytes ?: 0L) / GIB)
+            addToMonth(ms / 3_600_000.0 * (gpuRate(u) + cores * (rates[CPU_RATE] ?: 0.0) + memGiB * (rates[MEM_RATE] ?: 0.0)))
+            u.countedUntil = now
+        }
+        if (cpuNs != null) u.cpuNs = cpuNs
+        if (memBytes != null) u.memBytes = memBytes
+    }
+
+    private fun gpuRate(u: Up): Double = if (u.gpu.isEmpty()) 0.0 else gpus().firstOrNull { it.id == u.gpu }?.usdPerHour ?: 0.0
 
     /** Snapshots the running sandbox and keeps the snapshot as the chat's; the one before goes. */
     private suspend fun checkpoint(name: String) = lock(name).withLock {
@@ -225,6 +319,8 @@ class ModalSandboxes(
     private suspend fun stopLocked(name: String, snapshot: Boolean) {
         val u = up.remove(name) ?: return
         checked.remove(name)
+        // What it used since the last reading, before it goes.
+        touch(u)
         try {
             if (snapshot) recordImage(name, agent.call("snapshot", JSONObject().put("sandbox", u.id).put("ttl", SNAPSHOT_TTL_SECS)).getString("image"))
         } finally {
@@ -281,7 +377,7 @@ class ModalSandboxes(
                 if (isBusy(name) || up.containsKey(name)) continue
                 runCatching {
                     lock(name).withLock {
-                        up[name] = Up(o.getString("sandbox"), o.optJSONObject("tags")?.optString("gpu").orEmpty(), System.currentTimeMillis())
+                        up[name] = Up(o.getString("sandbox"), o.optJSONObject("tags")?.optString("gpu").orEmpty(), System.currentTimeMillis(), cpuNs = null)
                         stopLocked(name, snapshot = true)
                     }
                 }.onSuccess { log.add("$name: left running; saved and stopped") }
@@ -297,6 +393,8 @@ class ModalSandboxes(
      * started or the copy fails.
      */
     suspend fun downloadWorkspace(chatId: String, into: File): Boolean = withContext(Dispatchers.IO) {
+        val name = nameFor(chatId)
+        moving.add(name)
         try {
             use(chatId, "move") { ready ->
                 val zip = "/tmp/poordsh-move.zip"
@@ -317,8 +415,10 @@ class ModalSandboxes(
             }
             true
         } catch (e: Exception) {
-            log.add("${nameFor(chatId)}: workspace not copied out (${e.message})")
+            log.add("$name: workspace not copied out (${e.message})")
             false
+        } finally {
+            moving.remove(name)
         }
     }
 
@@ -384,31 +484,45 @@ class ModalSandboxes(
         if (budgetUsd() * LEAVE_SHARE - spent < rate * GPU_MIN_HOURS) throw GpuBudget(gpu)
     }
 
-    /** What this app's sandboxes have cost this month by its own count: run time at the requested shape. */
+    /**
+     * What this app's sandboxes have cost this month by its own count: what was
+     * read from them ([meter]), and each running one's time since then at its
+     * request.
+     */
     private fun estimate(): Double {
         val s = state()
         val counted = if (s.optString("month") == month()) s.optDouble("estimateUsd", 0.0) else 0.0
         val now = System.currentTimeMillis()
-        return counted + up.values.sumOf { costOf(it, now) }
+        return counted + up.values.sumOf { tailOf(it, now) }
     }
 
+    /** A sandbox that stopped: the time since its last reading, at its request. */
     private fun addCost(u: Up) {
-        val cost = costOf(u, System.currentTimeMillis())
+        val now = System.currentTimeMillis()
+        addToMonth(tailOf(u, now))
+        u.countedUntil = now
+    }
+
+    private fun addToMonth(usd: Double) {
+        if (usd <= 0) return
         editState {
             val month = month()
             val before = if (it.optString("month") == month) it.optDouble("estimateUsd", 0.0) else 0.0
-            it.put("month", month).put("estimateUsd", before + cost)
+            it.put("month", month).put("estimateUsd", before + usd)
         }
     }
 
-    private fun costOf(u: Up, now: Long): Double {
+    private fun tailOf(u: Up, now: Long): Double {
         if (rates.isEmpty()) return 0.0
-        val shape = if (u.gpu.isEmpty()) CPU else GPU
-        val hours = (now - u.since).coerceAtLeast(0) / 3_600_000.0
-        val gpu = if (u.gpu.isEmpty()) 0.0 else gpus().firstOrNull { it.id == u.gpu }?.usdPerHour ?: 0.0
-        val cpu = (rates[CPU_RATE] ?: 0.0) * shape.cpu.first
-        val mem = (rates[MEM_RATE] ?: 0.0) * shape.memoryMiB.first / 1024.0
-        return hours * (gpu + cpu + mem)
+        val b = savedBounds()
+        val hours = (now - u.countedUntil).coerceAtLeast(0) / 3_600_000.0
+        return hours * (gpuRate(u) + b.cpuMin * (rates[CPU_RATE] ?: 0.0) + b.memMinMiB / 1024.0 * (rates[MEM_RATE] ?: 0.0))
+    }
+
+    /** This month's cost by the larger of Modal's last summary and the app's own count has reached the budget. */
+    private fun overBudget(): Boolean {
+        val cached = usageCache?.second?.takeIf { it.month == month() }?.spentUsd ?: 0.0
+        return maxOf(cached, estimate()) >= budgetUsd()
     }
 
     // --- state on the phone ----------------------------------------------------------------
@@ -452,10 +566,19 @@ class ModalSandboxes(
         /** A held GPU sandbox no tool call has used for this long is saved and stopped. */
         const val GPU_HOLD_IDLE_MS = 10 * 60_000L
         private const val TOUCH_TIMEOUT_MS = 60_000L
-        /** A CPU sandbox: a slice of a core that can burst to 2, up to 4 GiB; 6 h at most, stopped by Modal after 5 idle minutes. */
-        val CPU = Shape(0.125 to 2.0, 256 to 4096, lifetimeSecs = 6 * 3600, idleSecs = 300)
-        /** A GPU sandbox: more host to feed the GPU; 2 h at most, stopped by Modal after 2 idle minutes. */
-        val GPU = Shape(0.5 to 4.0, 2048 to 16384, lifetimeSecs = 2 * 3600, idleSecs = 120)
+        /** A CPU sandbox: 6 h at most, stopped by Modal after 5 minutes without a command. */
+        val CPU = Shape(lifetimeSecs = 6 * 3600, idleSecs = 300)
+        /** A GPU sandbox: 2 h at most, stopped by Modal after 2 minutes without a command. */
+        val GPU = Shape(lifetimeSecs = 2 * 3600, idleSecs = 120)
+        /**
+         * Modal's bounds when they cannot be read: "CPU request must be >= 125 mCPU",
+         * "<= 64000 mCPU", "memory request must be >= 128 MiB", "<= 344064 MiB"
+         * (November 2026). Limits are not checked by Modal; the largest request is
+         * the largest sandbox it places.
+         */
+        val DEFAULT_BOUNDS = Bounds(cpuMin = 0.125, cpuMax = 64.0, memMinMiB = 128, memMaxMiB = 344064)
+        private const val BOUNDS_TTL_MS = 7L * 24 * 3600_000
+        private const val GIB = 1024.0 * 1024 * 1024
         /** New chats stop starting here at this share of the month's budget. */
         const val NEW_CHAT_SHARE = 0.8
         /** Chats here move on at this share, while there is still budget to copy their files out. */

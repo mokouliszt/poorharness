@@ -25,6 +25,12 @@ class FakeModal(private val io: File) : ModalClient {
         .put("endpoints_cpu", "9")
     /** op -> the kind its calls fail with. */
     val refuse = mutableMapOf<String, String>()
+    /** What `bounds` answers (Modal's refusals, parsed); the least CPU a start is accepted with. */
+    var bounds = JSONObject().put("cpuMin", 0.125).put("cpuMax", 64.0).put("memMin", 128).put("memMax", 344064)
+    var acceptCpuFrom = 0.125
+    /** What `touch` reads in each sandbox (CPU ns so far, memory bytes in use), by id. */
+    val cpuNs = mutableMapOf<String, Long>()
+    val memBytes = mutableMapOf<String, Long>()
     private var next = 0
 
     override var keepUp: () -> Boolean = { false }
@@ -50,6 +56,10 @@ class FakeModal(private val io: File) : ModalClient {
                 val name = args.getString("name")
                 if (byName(name) != null) throw ModalException("exists", "already running")
                 args.optString("image").takeIf { it.isNotEmpty() }?.let { if (it !in images) throw ModalException("notfound", "no image $it") }
+                val cpu = args.optJSONArray("cpu")?.optDouble(0) ?: 0.125
+                if (cpu < acceptCpuFrom) {
+                    throw ModalException("invalid", "InvalidError: CPU request must be >= ${(acceptCpuFrom * 1000).toInt()} mCPU (got ${(cpu * 1000).toInt()})")
+                }
                 val b = Box("sb-${++next}", name, args.getJSONObject("tags"), args)
                 sandboxes += b
                 JSONObject().put("sandbox", b.id)
@@ -64,7 +74,13 @@ class FakeModal(private val io: File) : ModalClient {
             }
             "terminate" -> { box().running = false; JSONObject().put("ok", true) }
             "deleteImage" -> { images -= args.getString("image"); deletedImages += args.getString("image"); JSONObject().put("ok", true) }
-            "touch" -> { box(); JSONObject().put("ok", true) }
+            "touch" -> {
+                val b = box()
+                if (!b.running) throw ModalException("notfound", "already shut down")
+                JSONObject().put("ok", true).put("cpuNs", cpuNs[b.id] ?: 0L).put("memBytes", memBytes[b.id] ?: 0L)
+            }
+            "bounds" -> JSONObject(bounds.toString())
+            "read" -> { box(); JSONObject().put("missing", true) }
             "run" -> { box(); JSONObject().put("exitCode", 0).put("stdout", "").put("stderr", "") }
             "ls" -> { box(); JSONObject().put("entries", JSONArray()) }
             else -> throw ModalException("invalid", "unknown op $op")

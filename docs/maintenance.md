@@ -95,7 +95,10 @@ reasons behind them are in [`docs/adr/`](adr/README.md).
     carries gRPC. Check that `Workspace.billing.rates()` still names prices
     `gpu_hour_cost_<gpu>`, `cpu_hour_cost_sandbox` and
     `mem_gib_hour_cost_sandbox`, that each GPU's id is still the name upper-cased
-    (`ModalSandboxes.GPU_IDS` lists the exceptions), and that the Starter
+    (`ModalSandboxes.GPU_IDS` lists the exceptions), that `bounds` still reads
+    the four numbers from Modal's refusals (`DEFAULT_BOUNDS` is the fallback),
+    that `touch` still gets `cpuNs` and `memBytes` from the sandbox's cgroup,
+    and that the Starter
     credits still match `ModalSandboxes.DEFAULT_BUDGET_USD`. If Modal's answer to
     a spent limit has been seen, write it into the script's `kind` and the ADR.
     `ModalSandboxesTest` covers the rest with a stand-in.

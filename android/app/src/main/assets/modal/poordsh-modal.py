@@ -12,6 +12,7 @@
 import base64
 import json
 import os
+import re
 import sys
 import threading
 import traceback
@@ -118,6 +119,30 @@ def op_start(r):
     return {"sandbox": sb.object_id}
 
 
+BOUND = re.compile(r"(CPU|memory) request must be ([<>])= (\d+) (mCPU|MiB)")
+
+
+def op_bounds(r):
+    # The smallest and largest CPU and memory a sandbox may ask for. Modal says
+    # them only when refusing a request, so ask for values far out of range:
+    # "CPU request must be >= 125 mCPU (got 0)", "... <= 64000 mCPU", "memory
+    # request must be >= 128 MiB", "... <= 344064 MiB" (November 2026).
+    out = {}
+    for kw in (dict(cpu=0.001), dict(cpu=10000.0), dict(memory=1), dict(memory=100_000_000)):
+        try:
+            sb = m().Sandbox.create("true", app=app(), image=base_image(), timeout=10, client=client(), **kw)
+            sb.terminate()
+        except Exception as e:
+            for what, side, n, _ in BOUND.findall(str(e)):
+                key = ("cpu" if what == "CPU" else "mem") + ("Min" if side == ">" else "Max")
+                out[key] = int(n)
+    # mCPU to cores; MiB as they are.
+    for k in ("cpuMin", "cpuMax"):
+        if k in out:
+            out[k] = out[k] / 1000
+    return out
+
+
 def op_list(r):
     out = []
     for sb in m().Sandbox.list(app_id=app().app_id, tags=r.get("tags") or None, client=client()):
@@ -130,9 +155,19 @@ def op_running(r):
 
 
 def op_touch(r):
-    # An empty command: Modal's idle stop counts from the last command.
-    sandbox(r["sandbox"]).exec("true", timeout=30).wait()
-    return {"ok": True}
+    # A command, so Modal's idle stop counts from now; it reads the sandbox's
+    # CPU time so far (ns) and memory in use (bytes), which the app bills itself
+    # with. Either may be missing.
+    p = sandbox(r["sandbox"]).exec(
+        "sh", "-c", "cat /sys/fs/cgroup/cpuacct/cpuacct.usage /sys/fs/cgroup/memory/memory.usage_in_bytes 2>/dev/null", timeout=30
+    )
+    lines = p.stdout.read().split()
+    p.wait()
+    nums = [int(x) for x in lines if x.isdigit()]
+    out = {"ok": True}
+    if len(nums) == 2:
+        out["cpuNs"], out["memBytes"] = nums
+    return out
 
 
 def op_run(r):
@@ -208,6 +243,7 @@ OPS = {
     "init": op_init,
     "check": op_check,
     "touch": op_touch,
+    "bounds": op_bounds,
     "usage": op_usage,
     "find": op_find,
     "start": op_start,
