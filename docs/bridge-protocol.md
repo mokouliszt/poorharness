@@ -44,10 +44,9 @@ Named `poordsh-<chat id>` (`ModalSandboxes.nameFor`) in the Modal App
 Modal's Python SDK in its own Ubuntu (`assets/modal/poordsh-modal.py`), so the
 token stays in the app.
 
-- Started on the chat's first message, asking for the least CPU and memory
-  Modal allows and allowed up to the most (0.125 to 64 cores, 128 MiB to
-  336 GiB; read from Modal weekly); with the chat's GPU on, also the GPU set in
-  Settings. Snapshotted when the chat lets go and stopped 60 s later;
+- Started on the chat's first message, reserving 2 cores and 8 GiB and allowed
+  up to the most Modal allows (64 cores, 336 GiB; read from Modal weekly); with
+  the chat's GPU on, also the GPU set in Settings. Snapshotted when the chat lets go and stopped 60 s later;
   the next use starts from the snapshot with every file. Snapshots expire after
   30 days; the sandbox and its snapshot are deleted with the chat.
 - A held sandbox gets a command every 50 s, which also reads its CPU time and

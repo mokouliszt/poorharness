@@ -1,6 +1,6 @@
 # Modal first, then Upstash Box, Tensorlake and the device
 
-Status: accepted (2026-11, 0.20.0; sandboxes sized to Modal's bounds in 0.20.1)
+Status: accepted (2026-11, 0.20.0; sandbox sizes revised in 0.20.1 and 0.20.2)
 
 ## Context
 
@@ -36,7 +36,14 @@ SDK 1.6.3:
 - inside, a sandbox asking for 0.125 cores and allowed 64 sees `nproc` 1 but 64
   CPUs (`os.cpu_count()`; 43 on a T4 host), and 8 busy loops got 7.9 cores; its
   cgroup v1 counters are readable: `cpuacct/cpuacct.usage` (CPU ns since it
-  started) and `memory/memory.usage_in_bytes` (memory in use).
+  started) and `memory/memory.usage_in_bytes` (memory in use);
+- in a sandbox reserving 0.125 cores and allowed Modal's most, this app's own
+  `assembleRelease` (Gradle at `-Xmx3g`, R8) took 119 s, 664 CPU-seconds
+  (5.6 cores on average) and peaked at 5.1 GiB the first time, with downloads;
+  58 s, 390 CPU-seconds and 4.8 GiB rebuilt clean. .NET 10 WinForms and WPF
+  template builds for Windows (`EnableWindowsTargeting`) took 5–9 s and stayed
+  under 250 MiB; a self-contained single-file WPF publish, 8 s, 22 CPU-seconds
+  and 461 MiB.
 
 How Modal refuses work once a spend limit or the credits are used up is not
 documented and was not observed: the test account's credits were not spent on
@@ -68,12 +75,16 @@ what Modal keeps working.
 **One sandbox per chat** (`modal/ModalSandboxes.kt`), in the Modal App
 `poorharness`, named `poordsh-<chat id>` and tagged `poordsh=1`, `chat` and
 `gpu`; Modal's Debian image with git, curl, zip, unzip, procps and ripgrep;
-workspace `/tmp/workspace` as everywhere. Every sandbox asks for the least CPU
-and memory Modal allows and may use up to the most it allows (0.125 to 64 cores,
-128 MiB to 336 GiB in November 2026). The app reads those bounds from Modal's
-refusals once a week (`bounds` in the helper), and again when Modal refuses a
-start for them, so a change at Modal needs no new release; without an answer it
-uses the values above. A CPU sandbox is ended by Modal after 6 hours, or 5
+workspace `/tmp/workspace` as everywhere. Every sandbox reserves 2 cores and
+8 GiB (`ModalSandboxes.RESERVE`) and may use up to the most Modal allows (64
+cores, 336 GiB in November 2026). The reservation is what Modal guarantees when
+its machine is busy: 8 GiB holds an Android build like the one above with room
+for a larger Gradle heap, and 2 cores keeps its clean rebuild to a few minutes
+(it got 6.7 cores when the machine was free); .NET builds need far less. The
+app reads Modal's bounds from its refusals once a week (`bounds` in the
+helper), and again when Modal refuses a start for them, so a change at Modal
+needs no new release (the reservation is kept within them); without an answer
+it uses the values above. A CPU sandbox is ended by Modal after 6 hours, or 5
 minutes without a command. Commands run through `sandbox/runner.sh`, as in a
 box.
 
@@ -128,10 +139,12 @@ not set yet.
   one switch away. Processes end when a chat lets go, as with Box.
 - The first token takes a minute or two to install Modal's SDK (tens of MB),
   and a Python process runs on the phone while Modal sandboxes are up.
-- A sandbox can use far more than a phone-sized job needs: a tool that starts a
-  worker per CPU (`os.cpu_count()` is 64) can run 64 cores, about $9 an hour,
-  and memory is capped only by Modal's largest sandbox. `nproc` stays 1, so
-  `make -j$(nproc)` and the like stay small.
+- A held sandbox costs its reservation, about $0.48 an hour (2 × $0.1419 +
+  8 × $0.024), while the model thinks too: a $30 budget is about 60 hours of
+  chats in Modal. Above it, a tool that starts a worker per CPU
+  (`os.cpu_count()` is 64) can run 64 cores, about $9 an hour, and memory is
+  capped only by Modal's largest sandbox. `nproc` reports the reservation (2),
+  so `make -j$(nproc)` and the like stay small.
 - The app reads usage every 50 s and memory only at those moments, so a burst
   between readings is caught by CPU time but not by memory, and up to 50 s of
   running past the budget is possible; Modal's summary lags by minutes. Modal's

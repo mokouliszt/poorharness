@@ -30,10 +30,11 @@ import java.util.zip.ZipInputStream
  * left without commands for [CPU.idleSecs] or [GPU.idleSecs] and any after its
  * lifetime, so a phone that dies cannot leave one running.
  *
- * Each sandbox asks for the least CPU and memory Modal allows and may use up to
- * the most it allows ([Bounds], read from Modal once a week). Modal bills the
- * larger of request and use, so the app reads each held sandbox's CPU time and
- * memory as it goes ([meter]) and stops it once the month's budget is reached.
+ * Each sandbox reserves [RESERVE], enough for an Android or a .NET build, and
+ * may use up to the most Modal allows ([Bounds], read from Modal once a week).
+ * Modal bills the larger of request and use, so the app reads each held
+ * sandbox's CPU time and memory as it goes ([meter]) and stops it once the
+ * month's budget is reached.
  *
  * A chat with [gpuFor] on gets a GPU of [gpuType]; switching takes a snapshot
  * and starts the sandbox again with or without it. New chats start here while
@@ -61,7 +62,14 @@ class ModalSandboxes(
     data class Shape(val lifetimeSecs: Int, val idleSecs: Int)
 
     /** The least and most CPU (cores) and memory (MiB) Modal lets a sandbox ask for. */
-    data class Bounds(val cpuMin: Double, val cpuMax: Double, val memMinMiB: Int, val memMaxMiB: Int)
+    data class Bounds(val cpuMin: Double, val cpuMax: Double, val memMinMiB: Int, val memMaxMiB: Int) {
+        /** What a sandbox reserves: [RESERVE], within these bounds. */
+        val requestCpu: Double get() = RESERVE.cpu.coerceIn(cpuMin, cpuMax)
+        val requestMemMiB: Int get() = RESERVE.memMiB.coerceIn(memMinMiB, memMaxMiB)
+    }
+
+    /** CPU cores and MiB a sandbox is guaranteed, whatever else runs on Modal's machine. */
+    data class Reserve(val cpu: Double, val memMiB: Int)
 
     /**
      * A running sandbox. Its cost is counted into the month up to [countedUntil]:
@@ -231,8 +239,8 @@ class ModalSandboxes(
             .put("timeout", shape.lifetimeSecs)
             .put("idleTimeout", shape.idleSecs)
             .put("workdir", WORKSPACE)
-            .put("cpu", org.json.JSONArray(listOf(b.cpuMin, b.cpuMax)))
-            .put("memory", org.json.JSONArray(listOf(b.memMinMiB, b.memMaxMiB)))
+            .put("cpu", org.json.JSONArray(listOf(b.requestCpu, b.cpuMax)))
+            .put("memory", org.json.JSONArray(listOf(b.requestMemMiB, b.memMaxMiB)))
         image?.let { args.put("image", it) }
         if (gpu.isNotEmpty()) args.put("gpu", gpu)
         return try {
@@ -299,8 +307,8 @@ class ModalSandboxes(
         if (ms > 0 && rates.isNotEmpty()) {
             val b = savedBounds()
             val before = u.cpuNs
-            val cores = if (cpuNs != null && before != null && cpuNs >= before) maxOf(b.cpuMin, (cpuNs - before) / 1e6 / ms) else b.cpuMin
-            val memGiB = maxOf(b.memMinMiB / 1024.0, maxOf(u.memBytes, memBytes ?: 0L) / GIB)
+            val cores = if (cpuNs != null && before != null && cpuNs >= before) maxOf(b.requestCpu, (cpuNs - before) / 1e6 / ms) else b.requestCpu
+            val memGiB = maxOf(b.requestMemMiB / 1024.0, maxOf(u.memBytes, memBytes ?: 0L) / GIB)
             addToMonth(ms / 3_600_000.0 * (gpuRate(u) + cores * (rates[CPU_RATE] ?: 0.0) + memGiB * (rates[MEM_RATE] ?: 0.0)))
             u.countedUntil = now
         }
@@ -516,7 +524,7 @@ class ModalSandboxes(
         if (rates.isEmpty()) return 0.0
         val b = savedBounds()
         val hours = (now - u.countedUntil).coerceAtLeast(0) / 3_600_000.0
-        return hours * (gpuRate(u) + b.cpuMin * (rates[CPU_RATE] ?: 0.0) + b.memMinMiB / 1024.0 * (rates[MEM_RATE] ?: 0.0))
+        return hours * (gpuRate(u) + b.requestCpu * (rates[CPU_RATE] ?: 0.0) + b.requestMemMiB / 1024.0 * (rates[MEM_RATE] ?: 0.0))
     }
 
     /** This month's cost by the larger of Modal's last summary and the app's own count has reached the budget. */
@@ -577,6 +585,15 @@ class ModalSandboxes(
          * the largest sandbox it places.
          */
         val DEFAULT_BOUNDS = Bounds(cpuMin = 0.125, cpuMax = 64.0, memMinMiB = 128, memMaxMiB = 344064)
+        /**
+         * Reserved for every sandbox. Measured in a Modal sandbox (November 2026):
+         * this app's own `assembleRelease` (Gradle at -Xmx3g, R8) peaked at 5.1 GiB
+         * and 664 CPU-seconds, 390 when rebuilt clean; .NET WinForms and WPF builds,
+         * and a self-contained WPF publish, stayed under 0.5 GiB and 22 CPU-seconds.
+         * 8 GiB leaves room for a larger Gradle heap; 2 cores keeps a clean Android
+         * rebuild to a few minutes when Modal's machine is busy (it got 6.7 when not).
+         */
+        val RESERVE = Reserve(cpu = 2.0, memMiB = 8192)
         private const val BOUNDS_TTL_MS = 7L * 24 * 3600_000
         private const val GIB = 1024.0 * 1024 * 1024
         /** New chats stop starting here at this share of the month's budget. */

@@ -52,10 +52,10 @@ class ModalSandboxesTest {
         assertEquals("c_1", b.tags.getString("chat"))
         assertEquals("", b.tags.getString("gpu"))
         assertFalse(b.args.has("gpu"))
-        // Billed at max(request, use): Modal's least as the request, its most as the limit, and its own stops.
-        assertEquals(0.125, b.args.getJSONArray("cpu").getDouble(0), 0.0)
+        // Billed at max(request, use): enough reserved for a build, Modal's most as the limit, and its own stops.
+        assertEquals(2.0, b.args.getJSONArray("cpu").getDouble(0), 0.0)
         assertEquals(64.0, b.args.getJSONArray("cpu").getDouble(1), 0.0)
-        assertEquals(128, b.args.getJSONArray("memory").getInt(0))
+        assertEquals(8192, b.args.getJSONArray("memory").getInt(0))
         assertEquals(344064, b.args.getJSONArray("memory").getInt(1))
         assertEquals(ModalSandboxes.CPU.idleSecs, b.args.getInt("idleTimeout"))
         assertEquals(ModalSandboxes.CPU.lifetimeSecs, b.args.getInt("timeout"))
@@ -222,11 +222,10 @@ class ModalSandboxesTest {
     @Test
     fun theBoundsFollowModalAndAreReadOncePerWeek() = runBlocking {
         modal.bounds = JSONObject().put("cpuMin", 0.25).put("cpuMax", 96.0).put("memMin", 256).put("memMax", 500000)
-        modal.acceptCpuFrom = 0.25
         sandboxes().ensure("c_1")
         val start = modal.ops("start").last()
-        assertEquals(listOf(0.25, 96.0), (0..1).map { start.getJSONArray("cpu").getDouble(it) })
-        assertEquals(listOf(256, 500000), (0..1).map { start.getJSONArray("memory").getInt(it) })
+        assertEquals(listOf(2.0, 96.0), (0..1).map { start.getJSONArray("cpu").getDouble(it) })
+        assertEquals(listOf(8192, 500000), (0..1).map { start.getJSONArray("memory").getInt(it) })
         // Kept: another start, even after a restart of the app, does not ask again.
         sandboxes().ensure("c_2")
         assertEquals(1, modal.ops("bounds").size)
@@ -236,12 +235,12 @@ class ModalSandboxesTest {
     fun aRefusedBoundIsReadAgainAndTheStartRetried() = runBlocking {
         val s = sandboxes()
         s.ensure("c_1")
-        // Modal raised its minimum since the bounds were read.
-        modal.bounds = JSONObject().put("cpuMin", 0.25).put("cpuMax", 64.0).put("memMin", 128).put("memMax", 344064)
-        modal.acceptCpuFrom = 0.25
+        // Modal raised its minimum above the reservation since the bounds were read.
+        modal.bounds = JSONObject().put("cpuMin", 3.0).put("cpuMax", 64.0).put("memMin", 128).put("memMax", 344064)
+        modal.acceptCpuFrom = 3.0
         s.ensure("c_2")
         assertEquals(2, modal.ops("bounds").size)
-        assertEquals(0.25, modal.ops("start").last().getJSONArray("cpu").getDouble(0), 0.0)
+        assertEquals(3.0, modal.ops("start").last().getJSONArray("cpu").getDouble(0), 0.0)
         assertNotNull(modal.byName("poordsh-c-2"))
     }
 
@@ -276,7 +275,7 @@ class ModalSandboxesTest {
         val idle = s.usage(refresh = true).spentUsd
         modal.memBytes[id] = 300L shl 30
         Thread.sleep(600)
-        // 300 GiB at $0.024 an hour is about $0.0012 in 0.6 s; the 128 MiB request alone, a two-thousandth of that.
+        // 300 GiB at $0.024 an hour is about $0.0012 in 0.6 s; the 8 GiB request, a fortieth of that.
         assertTrue(s.usage(refresh = true).spentUsd - idle > 0.0008)
         s.release("c_1", "t")
     }

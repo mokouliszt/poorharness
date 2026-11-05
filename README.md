@@ -171,9 +171,10 @@ start. Optional:
 - On Tensorlake's free plan only one cloud chat works at a time; starting
   another pauses sandboxes that are idle, and waits if the other chat is still
   working.
-- **Set a spend limit in Modal too.** A Modal sandbox asks for Modal's
-  smallest share of CPU and memory and may grow to its largest (64 cores,
-  336 GiB), billed as used. The app reads each sandbox's use every 50 s, adds
+- **Set a spend limit in Modal too.** A Modal sandbox reserves 2 cores and
+  8 GiB, enough for an Android or .NET build, and may grow to Modal's largest
+  (64 cores, 336 GiB), billed as used. The reservation costs about $0.48 an hour
+  while a chat works, model time included, so $30 is about 60 hours. The app reads each sandbox's use every 50 s, adds
   Modal's bill (which lags by minutes) and stops sandboxes at the budget, but a
   burst between readings can still pass it. Modal's own limit is what really
   caps the bill. Programs in a Modal sandbox stop a minute after the turn ends (the
